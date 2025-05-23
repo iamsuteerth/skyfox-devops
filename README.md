@@ -29,7 +29,7 @@ skyfox-devops/
 │   ├── outputs.tf           # Root outputs
 │   └── modules/
 │       ├── networking/      # ✅ VPC, subnets, security groups
-│       ├── ecr/             # 🔄 Docker repositories (planned)
+│       ├── ecr/             # ✅ Docker repositories
 │       ├── ecs/             # 🔄 Container services (planned)
 │       └── alb/             # 🔄 Load balancer (planned)
 └── gocd/                    # 🔄 CI/CD pipelines (planned)
@@ -49,6 +49,13 @@ ap-south-1a: 10.0.1.0/24 (public) + 10.0.10.0/24 (private)
 ap-south-1b: 10.0.2.0/24 (public) + 10.0.20.0/24 (private)  
 ap-south-1c: 10.0.3.0/24 (public) + 10.0.30.0/24 (private)
 ```
+
+### ECR Infrastructure
+Docker repositories for microservices:
+- **3 Repositories**: backend, payment-service, movie-service
+- **Security**: Vulnerability scanning enabled, AES256 encryption
+- **Cost Optimization**: Lifecycle policies (keep 4 images, cleanup after 3 days)
+- **CI/CD Ready**: Repository URLs available for GoCD pipelines
 
 ## Prerequisites
 
@@ -85,6 +92,13 @@ terraform apply
 ```
 
 ### Step 3: Verify Deployment
-- Check AWS Console for VPC, subnets, and security groups
-- Verify networking components are properly tagged
-- Confirm security groups have correct ingress/egress rules
+- **Networking**: Check VPC, subnets, and security groups in AWS Console
+- **ECR**: Verify repositories are created with proper lifecycle policies
+- **Outputs**: Confirm VPC ID and ECR repository URLs are available
+
+### Step 4: Ready for Next Phase
+With networking and ECR complete, you can now:
+- Push Docker images to ECR repositories
+- Proceed with ECS cluster setup
+- Configure Application Load Balancer
+
