@@ -6,7 +6,7 @@ This repository contains the infrastructure as code (IaC) for the SkyFox project
 
 ## Architecture
 
-The SkyFox backend consists of three microservices:
+The SkyFox backend consists of three components:
 - **Backend Service** (Port 8080): Main application backend
 - **Payment Service** (Port 8082): Handles payment processing
 - **Movie Service** (Port 4567): Manages movie-related functionality
@@ -20,19 +20,24 @@ These services are deployed as Docker containers in an ECS cluster, with traffic
 
 ```
 skyfox-devops/
-├── terraform/               # Terraform configuration files
-│   ├── modules/             # Reusable Terraform modules
-│   │   ├── networking/      # ✅ VPC, subnets, security groups
-│   │   │   ├── main.tf      # Network resource definitions
-│   │   │   ├── variables.tf # Input variables
-│   │   │   └── outputs.tf   # Exported network values
-│   │   ├── ecr/             # 🔄 Docker image repositories (planned)
-│   │   ├── ecs/             # 🔄 ECS cluster, services, tasks (planned)
-│   │   └── alb/             # 🔄 Application Load Balancer (planned)
-│   ├── main.tf              # ✅ Main Terraform configuration
-│   ├── variables.tf         # ✅ Global variables
-│   └── outputs.tf           # ✅ Root output values
-└── README.md                # This file
+├── LICENSE                  # Project license
+├── README.md                # This file
+└── terraform/               # Terraform configuration files
+    ├── backend.tf           # ✅ Remote state configuration
+    ├── providers.tf         # ✅ Provider configuration
+    ├── terraform.tf         # ✅ Terraform version requirements
+    ├── main.tf              # ✅ Main module calls
+    ├── variables.tf         # ✅ Global variables
+    ├── outputs.tf           # ✅ Root output values
+    └── modules/             # Reusable Terraform modules
+        ├── networking/      # ✅ VPC, subnets, routing
+        │   ├── network.tf   # Network resource definitions
+        │   ├── variables.tf # Input variables
+        │   └── outputs.tf   # Exported network values
+        ├── ecr/             # 🔄 Docker image repositories (planned)
+        ├── ecs/             # 🔄 ECS cluster, services, tasks (planned)
+        └── alb/             # 🔄 Application Load Balancer (planned)
+
 ```
 
 ## ✅ Completed Infrastructure Components
