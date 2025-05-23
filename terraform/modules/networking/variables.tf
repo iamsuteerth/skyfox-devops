@@ -31,3 +31,26 @@ variable "private_subnet_cidrs" {
   type        = list(string)
   default     = ["10.0.10.0/24", "10.0.20.0/24", "10.0.30.0/24"]
 }
+variable "enable_https" {
+  description = "Enable HTTPS on ALB"
+  type        = bool
+  default     = false
+}
+
+variable "backend_port" {
+  description = "Port for backend service"
+  type        = number
+  default     = 8080
+}
+
+variable "payment_port" {
+  description = "Port for payment service"
+  type        = number
+  default     = 8082
+}
+
+variable "movie_port" {
+  description = "Port for movie service"
+  type        = number
+  default     = 4567
+}

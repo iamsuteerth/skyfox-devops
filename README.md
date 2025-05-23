@@ -20,104 +20,71 @@ These services are deployed as Docker containers in an ECS cluster, with traffic
 
 ```
 skyfox-devops/
-├── LICENSE                  # Project license
-├── README.md                # This file
-└── terraform/               # Terraform configuration files
-    ├── backend.tf           # ✅ Remote state configuration
-    ├── providers.tf         # ✅ Provider configuration
-    ├── terraform.tf         # ✅ Terraform version requirements
-    ├── main.tf              # ✅ Main module calls
-    ├── variables.tf         # ✅ Global variables
-    ├── outputs.tf           # ✅ Root output values
-    └── modules/             # Reusable Terraform modules
-        ├── networking/      # ✅ VPC, subnets, routing
-        │   ├── network.tf   # Network resource definitions
-        │   ├── variables.tf # Input variables
-        │   └── outputs.tf   # Exported network values
-        ├── ecr/             # 🔄 Docker image repositories (planned)
-        ├── ecs/             # 🔄 ECS cluster, services, tasks (planned)
-        └── alb/             # 🔄 Application Load Balancer (planned)
-
+├── terraform/               # Infrastructure as Code
+│   ├── backend.tf           # Remote state configuration
+│   ├── providers.tf         # AWS provider setup
+│   ├── terraform.tf         # Version requirements
+│   ├── main.tf              # Module orchestration
+│   ├── variables.tf         # Global variables
+│   ├── outputs.tf           # Root outputs
+│   └── modules/
+│       ├── networking/      # ✅ VPC, subnets, security groups
+│       ├── ecr/             # 🔄 Docker repositories (planned)
+│       ├── ecs/             # 🔄 Container services (planned)
+│       └── alb/             # 🔄 Load balancer (planned)
+└── gocd/                    # 🔄 CI/CD pipelines (planned)
 ```
 
-## ✅ Completed Infrastructure Components
+## ✅ Current Status
 
-### Remote State Management
-- **S3 Backend**: Terraform state stored in `skyfox-terraform-state` bucket
-- **DynamoDB Locking**: State locks managed via `skyfox-terraform-locks` table
-- **Encryption**: State files encrypted at rest
-
-### Networking (VPC)
-- **Multi-AZ Setup**: 3 Availability Zones for high availability
-- **Public Subnets**: For load balancer and backend service (Supabase connectivity)
-- **Private Subnets**: For movie and payment services (no internet access)
-- **Cost Optimized**: No NAT Gateway (services use public subnets when needed)
+### Networking Infrastructure
+Complete VPC setup with multi-AZ architecture:
+- **VPC**: `10.0.0.0/16` across 3 availability zones
+- **Public Subnets**: For ALB and backend service (Supabase connectivity)
+- **Private Subnets**: For payment and movie services (no internet access)
+- **Security Groups**: Configured for each service with least-privilege access
 
 ```
-VPC: 10.0.0.0/16
-├── ap-south-1a
-│   ├── Public:  10.0.1.0/24
-│   └── Private: 10.0.10.0/24
-├── ap-south-1b
-│   ├── Public:  10.0.2.0/24
-│   └── Private: 10.0.20.0/24
-└── ap-south-1c
-    ├── Public:  10.0.3.0/24
-    └── Private: 10.0.30.0/24
+ap-south-1a: 10.0.1.0/24 (public) + 10.0.10.0/24 (private)
+ap-south-1b: 10.0.2.0/24 (public) + 10.0.20.0/24 (private)  
+ap-south-1c: 10.0.3.0/24 (public) + 10.0.30.0/24 (private)
 ```
 
-## Getting Started
-
-### Prerequisites
+## Prerequisites
 
 - AWS CLI configured with appropriate permissions
 - Terraform installed (version 1.0+)
 - Docker for local development and testing
 
-## Setup Instructions
+## Deployment Guide
 
-### 1. Set up AWS Remote State Management
-
-Create an S3 bucket for Terraform state:
+### Step 1: Remote State Setup
 ```bash
-aws s3api create-bucket \
-  --bucket skyfox-terraform-state \
-  --create-bucket-configuration LocationConstraint=ap-south-1
+# Create S3 bucket for state
+aws s3api create-bucket --bucket skyfox-terraform-state --create-bucket-configuration LocationConstraint=ap-south-1
+
+# Enable versioning
+aws s3api put-bucket-versioning --bucket skyfox-terraform-state --versioning-configuration Status=Enabled
+
+# Create DynamoDB table for locking
+aws dynamodb create-table --table-name skyfox-terraform-locks --attribute-definitions AttributeName=LockID,AttributeType=S --key-schema AttributeName=LockID,KeyType=HASH --billing-mode PAY_PER_REQUEST
 ```
 
-Enable versioning on the bucket:
-```bash
-aws s3api put-bucket-versioning \
-  --bucket skyfox-terraform-state \
-  --versioning-configuration Status=Enabled
-```
-
-Create DynamoDB table for state locking:
-```bash
-aws dynamodb create-table \
-  --table-name skyfox-terraform-locks \
-  --attribute-definitions AttributeName=LockID,AttributeType=S \
-  --key-schema AttributeName=LockID,KeyType=HASH \
-  --billing-mode PAY_PER_REQUEST
-```
-
-### 2. Deploy Networking Infrastructure
-
-Initialize Terraform:
+### Step 2: Deploy Infrastructure
 ```bash
 cd terraform
+
+# Initialize Terraform
 terraform init
-```
 
-Plan the deployment:
-```bash
+# Plan deployment
 terraform plan
-```
 
-Apply the networking configuration:
-```bash
+# Apply infrastructure
 terraform apply
 ```
 
-This creates 16 AWS resources including VPC, subnets, internet gateway, and route tables.
-
+### Step 3: Verify Deployment
+- Check AWS Console for VPC, subnets, and security groups
+- Verify networking components are properly tagged
+- Confirm security groups have correct ingress/egress rules

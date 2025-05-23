@@ -97,3 +97,215 @@ resource "aws_route_table_association" "private" {
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private.id
 }
+
+# ALB Security Group - Allow HTTP from Internet
+resource "aws_security_group" "alb" {
+  name_prefix = "${var.project_name}-${var.environment}-alb-"
+  vpc_id      = aws_vpc.main.id
+
+  # HTTP ingress
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # HTTPS ingress (if enabled)
+  dynamic "ingress" {
+    for_each = var.enable_https ? [1] : []
+    content {
+      description = "HTTPS"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  }
+
+  # All outbound traffic
+  egress {
+    description = "All outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-alb-sg"
+    Environment = var.environment
+    Project     = var.project_name
+    Purpose     = "Load Balancer"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Backend Service Security Group
+resource "aws_security_group" "backend" {
+  name_prefix = "${var.project_name}-${var.environment}-backend-"
+  vpc_id      = aws_vpc.main.id
+
+  # Backend port from ALB
+  ingress {
+    description     = "Backend API"
+    from_port       = var.backend_port
+    to_port         = var.backend_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  # All outbound (for Supabase connectivity)
+  egress {
+    description = "All outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-backend-sg"
+    Environment = var.environment
+    Project     = var.project_name
+    Purpose     = "Backend Service"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Payment Service Security Group
+resource "aws_security_group" "payment" {
+  name_prefix = "${var.project_name}-${var.environment}-payment-"
+  vpc_id      = aws_vpc.main.id
+
+  # Payment port from ALB only
+  ingress {
+    description     = "Payment API"
+    from_port       = var.payment_port
+    to_port         = var.payment_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  # No outbound internet (internal service only)
+  egress {
+    description = "Internal VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-payment-sg"
+    Environment = var.environment
+    Project     = var.project_name
+    Purpose     = "Payment Service"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Movie Service Security Group
+resource "aws_security_group" "movie" {
+  name_prefix = "${var.project_name}-${var.environment}-movie-"
+  vpc_id      = aws_vpc.main.id
+
+  # Movie port from ALB only
+  ingress {
+    description     = "Movie API"
+    from_port       = var.movie_port
+    to_port         = var.movie_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  # No outbound internet (internal service only)
+  egress {
+    description = "Internal VPC"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-movie-sg"
+    Environment = var.environment
+    Project     = var.project_name
+    Purpose     = "Movie Service"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ECS Instance Security Group
+resource "aws_security_group" "ecs_instance" {
+  name_prefix = "${var.project_name}-${var.environment}-ecs-"
+  vpc_id      = aws_vpc.main.id
+
+  # Allow traffic from service security groups
+  ingress {
+    description     = "Backend traffic"
+    from_port       = var.backend_port
+    to_port         = var.backend_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.backend.id]
+  }
+
+  ingress {
+    description     = "Payment traffic"
+    from_port       = var.payment_port
+    to_port         = var.payment_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.payment.id]
+  }
+
+  ingress {
+    description     = "Movie traffic"
+    from_port       = var.movie_port
+    to_port         = var.movie_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.movie.id]
+  }
+
+  # SSH access
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # All outbound
+  egress {
+    description = "All outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-ecs-instances-sg"
+    Environment = var.environment
+    Project     = var.project_name
+    Purpose     = "ECS Instances"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
