@@ -145,6 +145,41 @@ resource "aws_security_group" "alb" {
   }
 }
 
+# Internal ALB Security Group
+resource "aws_security_group" "internal_alb" {
+  name_prefix = "${var.project_name}-${var.environment}-internal-alb-"
+  vpc_id      = aws_vpc.main.id
+
+  # HTTP from backend service only
+  ingress {
+    description     = "HTTP from backend"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.backend.id]
+  }
+
+  # All outbound to reach payment/movie services
+  egress {
+    description = "All outbound"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-internal-alb-sg"
+    Environment = var.environment
+    Project     = var.project_name
+    Purpose     = "Internal Load Balancer"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 # Backend Service Security Group
 resource "aws_security_group" "backend" {
   name_prefix = "${var.project_name}-${var.environment}-backend-"
@@ -191,7 +226,7 @@ resource "aws_security_group" "payment" {
     from_port       = var.payment_port
     to_port         = var.payment_port
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
+    security_groups = [aws_security_group.internal_alb.id]
   }
 
   # No outbound internet (internal service only)
@@ -226,7 +261,7 @@ resource "aws_security_group" "movie" {
     from_port       = var.movie_port
     to_port         = var.movie_port
     protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
+    security_groups = [aws_security_group.internal_alb.id]
   }
 
   # No outbound internet (internal service only)

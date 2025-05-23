@@ -7,14 +7,37 @@ This repository contains the infrastructure as code (IaC) for the SkyFox project
 ## Architecture
 
 The SkyFox backend consists of three components:
-- **Backend Service** (Port 8080): Main application backend
-- **Payment Service** (Port 8082): Handles payment processing
-- **Movie Service** (Port 4567): Manages movie-related functionality
+- **Backend Service** (Port 8080): Main application backend with Supabase connectivity
+- **Payment Service** (Port 8082): Handles payment processing (internal only)
+- **Movie Service** (Port 4567): Manages movie-related functionality (internal only)
 
-These services are deployed as Docker containers in an ECS cluster, with traffic routed through an Application Load Balancer using path-based routing:
-- `/api` → Backend Service
-- `/payment-service` → Payment Service
-- `/movie-service` → Movie Service
+### Traffic Flow Architecture
+
+```
+Internet → External ALB → Backend Service (Public Subnet)
+
+Backend Service → Internal ALB → Payment Service (Private Subnet)
+                               → Movie Service   (Private Subnet)
+```
+
+**Frontend Communication:**
+- Frontend only communicates with Backend Service via External ALB
+- All API calls go to `/api` endpoints on Backend
+
+**Backend-to-Services Communication:**
+- Backend Service orchestrates calls to Payment and Movie services
+- Internal ALB provides load balancing and health checking for internal services
+- Path-based routing: `/payment` → Payment Service, `/movie` → Movie Service
+
+### Network Segmentation
+
+**Public Subnets:**
+- External ALB (internet-facing)
+- Backend (needs Supabase connectivity)
+
+**Private Subnets:**
+- Internal ALB
+- Payment and Movie Services (no direct internet access)
 
 ## Repository Structure
 
@@ -38,11 +61,11 @@ skyfox-devops/
 ## ✅ Current Status
 
 ### Networking Infrastructure
-Complete VPC setup with multi-AZ architecture:
+Complete VPC setup with multi-AZ architecture and security groups:
 - **VPC**: `10.0.0.0/16` across 3 availability zones
-- **Public Subnets**: For ALB and backend service (Supabase connectivity)
-- **Private Subnets**: For payment and movie services (no internet access)
-- **Security Groups**: Configured for each service with least-privilege access
+- **Public Subnets**: For External ALB and Backend Service
+- **Private Subnets**: For Internal ALB and Payment/Movie services
+- **Security Groups**: Configured for external ALB, internal ALB, and each service
 
 ```
 ap-south-1a: 10.0.1.0/24 (public) + 10.0.10.0/24 (private)
@@ -94,11 +117,4 @@ terraform apply
 ### Step 3: Verify Deployment
 - **Networking**: Check VPC, subnets, and security groups in AWS Console
 - **ECR**: Verify repositories are created with proper lifecycle policies
-- **Outputs**: Confirm VPC ID and ECR repository URLs are available
-
-### Step 4: Ready for Next Phase
-With networking and ECR complete, you can now:
-- Push Docker images to ECR repositories
-- Proceed with ECS cluster setup
-- Configure Application Load Balancer
-
+- **Security**: Confirm proper isolation between public and private subnets
