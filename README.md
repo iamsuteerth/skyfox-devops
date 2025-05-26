@@ -15,14 +15,14 @@ The SkyFox backend consists of three components:
 
 ```
 Internet → External ALB → Backend Service (Public Subnet)
-
+                       ↓
 Backend Service → Internal ALB → Payment Service (Private Subnet)
-                               → Movie Service   (Private Subnet)
+                               → Movie Service (Private Subnet)
 ```
 
 **Frontend Communication:**
 - Frontend only communicates with Backend Service via External ALB
-- All API calls go to `/api` endpoints on Backend
+- All API calls go to `/api` endpoints on Backend Service
 
 **Backend-to-Services Communication:**
 - Backend Service orchestrates calls to Payment and Movie services
@@ -33,7 +33,7 @@ Backend Service → Internal ALB → Payment Service (Private Subnet)
 
 **Public Subnets:**
 - External ALB (internet-facing)
-- Backend (needs Supabase connectivity)
+- Backend Service (needs Supabase connectivity)
 
 **Private Subnets:**
 - Internal ALB
@@ -53,9 +53,9 @@ skyfox-devops/
 │   └── modules/
 │       ├── networking/      # ✅ VPC, subnets, security groups
 │       ├── ecr/             # ✅ Docker repositories
-│       ├── ecs/             # 🔄 Container services (planned)
-│       └── alb/             # 🔄 Load balancer (planned)
-└── gocd/                    # 🔄 CI/CD pipelines (planned)
+│       ├── ecs/             # 🔄 Container services (in progress)
+│       └── alb/             # Load balancer (pending)
+└── gocd/                    # CI/CD pipelines (planned)
 ```
 
 ## ✅ Current Status
@@ -79,6 +79,42 @@ Docker repositories for microservices:
 - **Security**: Vulnerability scanning enabled, AES256 encryption
 - **Cost Optimization**: Lifecycle policies (keep 4 images, cleanup after 3 days)
 - **CI/CD Ready**: Repository URLs available for GoCD pipelines
+
+### ECS Infrastructure
+Container orchestration foundation:
+- **IAM Roles**: ✅ Instance, execution, and task roles configured
+- **ECS Cluster**: ✅ Container orchestration platform with Container Insights
+- **Launch Template**: ✅ t4g.small ARM64 instances with ECS-optimized AMI
+- **User Data Script**: ✅ Automatic cluster registration for EC2 instances
+- **Auto Scaling Group**: 🔄 Next - Compute capacity management
+- **Task Definitions**: 🔄 Pending - Container blueprints for each service
+- **ECS Services**: 🔄 Pending - Service deployment and management
+
+## Learning Highlights
+
+### Terraform Advanced Features
+Key concepts mastered during infrastructure development:
+
+**Template Variables and Dependencies:**
+- Using `templatefile()` function for dynamic user data scripts
+- Proper resource ordering to avoid circular dependencies
+- ARM64 architecture support for cost-effective t4g.small instances
+
+**IAM Role Architecture:**
+- **Instance Role**: EC2 instances join ECS cluster
+- **Task Execution Role**: ECS pulls images and manages containers  
+- **Task Role**: Applications access AWS services (S3 for backend)
+
+**Security Group Design:**
+- **External ALB SG**: HTTP from internet to backend service
+- **Internal ALB SG**: HTTP from backend to payment/movie services
+- **Service-specific SGs**: Least-privilege access patterns
+
+### Infrastructure Patterns
+- **Multi-AZ VPC**: High availability across 3 availability zones
+- **Public/Private Segmentation**: Proper isolation for security
+- **Cost Optimization**: Free-tier eligible resources and lifecycle policies
+- **Modular Design**: Reusable Terraform modules for different environments
 
 ## Prerequisites
 
@@ -117,4 +153,7 @@ terraform apply
 ### Step 3: Verify Deployment
 - **Networking**: Check VPC, subnets, and security groups in AWS Console
 - **ECR**: Verify repositories are created with proper lifecycle policies
-- **Security**: Confirm proper isolation between public and private subnets
+- **ECS**: Monitor cluster creation and instance registration
+
+---
+**Current Phase**: Building ECS container orchestration platform - Auto Scaling Group next
