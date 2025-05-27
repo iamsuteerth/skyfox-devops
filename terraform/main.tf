@@ -33,3 +33,21 @@ module "ecs" {
   # ECR inputs
   repository_urls = module.ecr.repository_urls
 }
+
+# ALB Module
+module "alb" {
+  source = "./modules/alb"
+  
+  project_name = var.project_name
+  environment  = var.environment
+  
+  # Networking inputs
+  vpc_id                        = module.networking.vpc_id
+  public_subnet_ids             = module.networking.public_subnet_ids
+  private_subnet_ids            = module.networking.private_subnet_ids
+  alb_security_group_id         = module.networking.alb_security_group_id
+  internal_alb_security_group_id = module.networking.internal_alb_security_group_id
+  
+  # ECS inputs
+  ecs_cluster_name = module.ecs.cluster_name
+}
