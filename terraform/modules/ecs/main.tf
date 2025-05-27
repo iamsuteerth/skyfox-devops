@@ -46,3 +46,47 @@ resource "aws_launch_template" "ecs" {
     Project     = var.project_name
   }
 }
+
+resource "aws_autoscaling_group" "ecs" {
+  name                = "${var.project_name}-${var.environment}-ecs-asg"
+  vpc_zone_identifier = concat(var.public_subnet_ids, var.private_subnet_ids)
+  
+  min_size         = var.min_capacity
+  max_size         = var.max_capacity
+  desired_capacity = var.desired_capacity
+  
+  launch_template {
+    id      = aws_launch_template.ecs.id
+    version = "$Latest"
+  }
+
+  health_check_type         = "EC2"  
+  health_check_grace_period = 300    
+  
+  default_cooldown          = 300    
+  termination_policies      = ["OldestInstance"]  
+  
+  tag {
+    key                 = "Name"
+    value               = "${var.project_name}-${var.environment}-ecs-instance"
+    propagate_at_launch = true
+  }
+  
+  tag {
+    key                 = "Environment"
+    value               = var.environment
+    propagate_at_launch = true
+  }
+  
+  tag {
+    key                 = "Project"
+    value               = var.project_name
+    propagate_at_launch = true
+  }
+  
+  tag {
+    key                 = "ECSCluster"
+    value               = aws_ecs_cluster.main.name
+    propagate_at_launch = true
+  }
+}
