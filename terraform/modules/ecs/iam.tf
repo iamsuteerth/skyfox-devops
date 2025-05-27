@@ -135,3 +135,24 @@ resource "aws_iam_role_policy" "s3_access_policy" {
     ]
   })
 }
+# Parameter Store access for ECS Task Execution Role
+resource "aws_iam_role_policy" "parameter_store_access" {
+  name = "${var.project_name}-${var.environment}-parameter-store"
+  role = aws_iam_role.ecs_task_execution_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters"
+        ]
+        Resource = [
+          "arn:aws:ssm:ap-south-1:*:parameter/skyfox-backend/*"
+        ]
+      }
+    ]
+  })
+}

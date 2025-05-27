@@ -90,3 +90,15 @@ resource "aws_autoscaling_group" "ecs" {
     propagate_at_launch = true
   }
 }
+
+# CloudWatch Log Group for ECS tasks
+resource "aws_cloudwatch_log_group" "ecs_logs" {
+  name              = "/ecs/${var.project_name}-${var.environment}"
+  retention_in_days = 7
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-ecs-logs"
+    Environment = var.environment
+    Project     = var.project_name
+  }
+}
