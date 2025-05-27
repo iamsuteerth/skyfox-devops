@@ -1,4 +1,3 @@
-# Networking Module
 module "networking" {
   source = "./modules/networking"
 
@@ -6,7 +5,6 @@ module "networking" {
   environment  = var.environment   
 }
 
-# ECR Module
 module "ecr" {
   source = "./modules/ecr"
   
@@ -14,7 +12,6 @@ module "ecr" {
   environment  = var.environment
 }
 
-# ECS Module
 module "ecs" {
   source = "./modules/ecs"
   
@@ -34,7 +31,6 @@ module "ecs" {
   repository_urls = module.ecr.repository_urls
 }
 
-# ALB Module
 module "alb" {
   source = "./modules/alb"
   
@@ -50,4 +46,10 @@ module "alb" {
   
   # ECS inputs
   ecs_cluster_name = module.ecs.cluster_name
+}
+module "s3" {
+  source = "./modules/s3"
+  
+  project_name = var.project_name
+  environment  = var.environment
 }

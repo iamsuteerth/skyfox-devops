@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository contains the infrastructure as code (IaC) for the SkyFox project - a microservices-based application demonstrating enterprise-grade DevOps practices. The infrastructure is provisioned using Terraform and deployed on AWS, featuring a complete container orchestration platform with intelligent load balancing and security architecture.
+This repository contains the infrastructure as code (IaC) for the SkyFox project - a microservices-based application demonstrating DevOps best practices. The infrastructure is provisioned using Terraform and deployed on AWS, featuring a complete container orchestration platform with load balancing and security architecture.
 
 ## Architecture
 
@@ -22,15 +22,15 @@ Backend Service → Internal ALB → /payment-service/* → Payment Service (Pri
 
 **Frontend Integration:**
 - Frontend communicates exclusively with Backend Service via External ALB
-- All API calls use `/` endpoint on Backend Service
+- All API calls use `/api` endpoints on Backend Service
 - Backend orchestrates internal service communication
 
 **Service-to-Service Communication:**
-- Backend Service calls: `http://internal-alb/payment-service/payment-service`
-- Backend Service calls: `http://internal-alb/movie-service/movies-service`
+- Backend Service calls: `http://internal-alb/payment-service/payment`
+- Backend Service calls: `http://internal-alb/movie-service/movies`
 - Internal ALB provides path-based routing, load balancing, and health monitoring
 
-### Advanced Network Segmentation
+### Network Segmentation
 
 **Public Subnets (Internet Access):**
 - External ALB (internet-facing load balancer)
@@ -58,23 +58,10 @@ skyfox-devops/
 │   ├── outputs.tf           # Root outputs (URLs, ARNs, environment configs)
 │   └── modules/
 │       ├── networking/      # VPC, subnets, security groups
-│       │   ├── network.tf
-│       │   ├── outputs.tf
-│       │   └── variables.tf
 │       ├── ecr/             # Docker repositories
-│       │   ├── main.tf
-│       │   ├── outputs.tf
-│       │   └── variables.tf
 │       ├── ecs/             # Container orchestration
-│       │   ├── main.tf      # Cluster, launch template, ASG
-│       │   ├── iam.tf       # Instance, execution, and task roles
-│       │   ├── user_data.sh # Automatic cluster registration
-│       │   ├── outputs.tf
-│       │   └── variables.tf
-│       └── alb/             # Load balancers
-│           ├── main.tf      # External + internal ALBs
-│           ├── outputs.tf   # Service URLs and target groups
-│           └── variables.tf
+│       ├── alb/             # Load balancers
+│       └── s3/              # Profile image storage
 └── gocd/                    # CI/CD pipelines (in future)
 ```
 
@@ -124,7 +111,7 @@ Production-ready Docker repositories with security and cost controls:
 - **ECS Cluster**: Container orchestration with Container Insights monitoring enabled
 - **Launch Template**: ARM64 ECS-optimized AMI with automatic cluster registration
 - **User Data Script**: Dynamic cluster name injection using Terraform templating
-- **Auto Scaling**: Intelligent capacity management (2-4 instances based on demand)
+- **Auto Scaling**: Capacity management (2-4 instances based on demand)
 
 ### Load Balancing Infrastructure (ALB)
 Dual-tier load balancing with path-based service routing:
@@ -149,9 +136,24 @@ Dual-tier load balancing with path-based service routing:
 - **Movie**: `/mshealth` endpoint (30s interval, 200 OK expected)
 - **Deregistration**: 30s delay for graceful shutdowns
 
+### Storage and Secret Management
+
+**S3 Profile Images Bucket:**
+- **Encryption**: AES256 server-side encryption
+- **Security**: All public access blocked
+- **Versioning**: Enabled for data protection
+- **CORS**: Configured for web uploads
+- **Unique naming**: Random suffix ensures global uniqueness
+
+**AWS Parameter Store:**
+- **Secrets**: JWT tokens, database URLs, API keys
+- **Encryption**: SecureString type with KMS
+- **IAM Integration**: ECS tasks retrieve secrets at runtime
+- **Environment Variables**: Non-sensitive config as direct environment variables
+
 ## Learning Highlights
 
-### Terraform Engineering Patterns
+### Terraform Patterns
 **Template Variables and Dependencies:**
 - Dynamic user data generation using `templatefile()` function with cluster name injection
 - Circular dependency resolution through proper resource ordering (cluster before launch template)
@@ -160,7 +162,7 @@ Dual-tier load balancing with path-based service routing:
 **Multi-Subnet Resource Strategies:**
 - Single Auto Scaling Group spanning multiple subnet types for resource efficiency
 - ECS placement constraints enable service-specific subnet targeting without resource waste
-- Mixed subnet approach reduces infrastructure costs by 50% vs dedicated ASGs
+- Mixed subnet approach reduces infrastructure costs vs dedicated ASGs
 
 **IAM Role Architecture:**
 - Clear separation: instance-level vs container-level vs application-level permissions
@@ -168,9 +170,9 @@ Dual-tier load balancing with path-based service routing:
 - Least-privilege security through role-specific, service-specific policies
 
 ### Infrastructure Design Patterns
-**Advanced Security Architecture:**
+**Security Architecture:**
 - Network segmentation without over-provisioning resources
-- Security group layering implementing defense-in-depth principles
+- Security group layering for defense-in-depth
 - Public/private subnet isolation with selective, service-specific internet access
 
 **Cost Optimization Strategies:**
@@ -178,15 +180,16 @@ Dual-tier load balancing with path-based service routing:
 - ECR lifecycle policies preventing storage cost drift
 - Resource consolidation through intelligent placement and mixed subnet strategies
 
-**Enterprise Scalability Foundations:**
-- Multi-AZ high availability with automatic failover capabilities
-- Auto Scaling Group integration ready for ECS capacity providers
-- Modular Terraform design enabling independent component scaling and environments
-
 **Load Balancing Intelligence:**
 - Path-based routing solving service URL complexity without custom DNS
 - Health check orchestration ensuring service reliability
-- Target group management for blue-green deployments
+- Target group management ready for blue-green deployments
+
+**Environment Variable Management:**
+- Parameter Store for secrets with KMS encryption
+- Direct environment variables for non-sensitive configuration
+- IAM-controlled access to specific parameter paths
+- Runtime secret injection without exposing secrets in code
 
 ### Container Orchestration Insights
 **Service Discovery and Communication:**
@@ -196,7 +199,7 @@ Dual-tier load balancing with path-based service routing:
 
 **Resource Planning and Allocation:**
 - Precise CPU and memory allocation (backend: 475/819, payment: 230/410, movie: 230/410)
-- Capacity planning ensuring 55% resource headroom for ECS agent and scaling
+- Capacity planning ensuring resource headroom for ECS agent and scaling
 - Mixed instance placement maximizing resource utilization efficiency
 
 ## Prerequisites
@@ -227,25 +230,35 @@ aws dynamodb create-table \
   --billing-mode PAY_PER_REQUEST
 ```
 
-### Step 2: Container Image Preparation
+### Step 2: Store Environment Variables
+```bash
+# Store secrets in Parameter Store
+aws ssm put-parameter --name "/skyfox-backend/jwt-secret" --value "your-jwt-secret" --type "SecureString"
+aws ssm put-parameter --name "/skyfox-backend/database-url" --value "your-supabase-url" --type "SecureString"
+aws ssm put-parameter --name "/skyfox-backend/movie-service-api-key" --value "your-key" --type "SecureString"
+aws ssm put-parameter --name "/skyfox-backend/payment-gateway-api-key" --value "your-key" --type "SecureString"
+aws ssm put-parameter --name "/skyfox-backend/s3-bucket" --value "bucket-name" --type "SecureString"
+```
+
+### Step 3: Container Image Preparation
 ```bash
 # Build and push backend service
 docker buildx build --platform linux/arm64 \
-  --tag [].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-backend:latest \
+  --tag [account].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-backend:latest \
   --push .
 
 # Build and push payment service
 docker buildx build --platform linux/arm64 \
-  --tag [].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-payment-service:latest \
+  --tag [account].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-payment-service:latest \
   --push .
 
 # Build and push movie service  
 docker buildx build --platform linux/arm64 \
-  --tag [].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-movie-service:latest \
+  --tag [account].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-movie-service:latest \
   --push .
 ```
 
-### Step 3: Infrastructure Deployment
+### Step 4: Infrastructure Deployment
 ```bash
 cd terraform
 
@@ -257,18 +270,4 @@ terraform plan
 
 # Deploy complete infrastructure
 terraform apply
-```
-
-### Step 4: Deployment Verification
-```bash
-# Verify ECS cluster and instances
-aws ecs describe-clusters --clusters skyfox-devprod-cluster
-aws ecs list-container-instances --cluster skyfox-devprod-cluster
-
-# Verify Auto Scaling Group
-aws autoscaling describe-auto-scaling-groups \
-  --auto-scaling-group-names skyfox-devprod-ecs-asg
-
-# Test load balancer endpoints
-curl http://$(terraform output -raw external_alb_dns_name)/health
 ```
