@@ -29,6 +29,13 @@ module "ecs" {
   
   # ECR inputs
   repository_urls = module.ecr.repository_urls
+
+  # ALB inputs
+  movie_service_url    = "${module.alb.internal_alb_url}/movie-service"
+  payment_gateway_url  = "${module.alb.internal_alb_url}/payment-service"
+  
+  # S3 inputs
+  s3_bucket_name = module.s3.bucket_name
 }
 
 module "alb" {

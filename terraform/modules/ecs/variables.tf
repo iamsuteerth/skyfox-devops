@@ -166,3 +166,18 @@ variable "movie_port" {
   type        = number
   default     = 4567
 }
+
+variable "movie_service_url" {
+  description = "URL for movie service (from ALB output)"
+  type        = string
+}
+
+variable "payment_gateway_url" {
+  description = "URL for payment gateway (from ALB output)"
+  type        = string
+}
+
+variable "s3_bucket_name" {
+  description = "Name of the S3 bucket for profile images"
+  type        = string
+}
