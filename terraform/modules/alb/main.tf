@@ -73,7 +73,8 @@ resource "aws_lb" "internal" {
   load_balancer_type = "application"
   
   security_groups = [var.internal_alb_security_group_id]
-  subnets = var.private_subnet_ids
+
+  subnets         = var.public_subnet_ids
   
   enable_http2 = true
 

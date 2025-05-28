@@ -14,11 +14,6 @@ variable "vpc_id" {
   type        = string
 }
 
-variable "private_subnet_ids" {
-  description = "Private subnet IDs where ECS instances will be launched"
-  type        = list(string)
-}
-
 variable "public_subnet_ids" {
   description = "Public subnet IDs (for backend service only)"
   type        = list(string)
@@ -50,11 +45,23 @@ variable "repository_urls" {
   type        = map(string)
 }
 
+variable "deploy_services" {
+  description = "Whether to deploy ECS services (set to false for initial infrastructure deployment)"
+  type        = bool
+  default     = false
+}
+
 # ECS Cluster Configuration
 variable "instance_type" {
   description = "EC2 instance type for ECS cluster"
   type        = string
   default     = "t4g.small"  
+}
+
+variable "key_pair_name" {
+  description = "EC2 Key Pair name for SSH access"
+  type        = string
+  default     = null
 }
 
 variable "min_capacity" {
@@ -179,5 +186,20 @@ variable "payment_gateway_url" {
 
 variable "s3_bucket_name" {
   description = "Name of the S3 bucket for profile images"
+  type        = string
+}
+
+variable "backend_target_group_arn" {
+  description = "ARN of the backend target group"
+  type        = string
+}
+
+variable "payment_target_group_arn" {
+  description = "ARN of the payment target group"
+  type        = string
+}
+
+variable "movie_target_group_arn" {
+  description = "ARN of the movie target group"
   type        = string
 }

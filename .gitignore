@@ -25,3 +25,6 @@ terraform.rc
 
 # Ignore lock files if you want to (optional)
 .terraform.lock.hcl
+
+# SSH Key Pairs
+*.pem

@@ -21,11 +21,13 @@ module "ecs" {
   # Networking inputs
   vpc_id                        = module.networking.vpc_id
   public_subnet_ids             = module.networking.public_subnet_ids
-  private_subnet_ids            = module.networking.private_subnet_ids
   backend_security_group_id     = module.networking.backend_security_group_id
   payment_security_group_id     = module.networking.payment_security_group_id
   movie_security_group_id       = module.networking.movie_security_group_id
   ecs_instance_security_group_id = module.networking.ecs_instance_security_group_id
+
+  # EC2 Key Pair
+  key_pair_name = "skyfox-key"
   
   # ECR inputs
   repository_urls = module.ecr.repository_urls
@@ -33,6 +35,9 @@ module "ecs" {
   # ALB inputs
   movie_service_url    = "${module.alb.internal_alb_url}/movie-service"
   payment_gateway_url  = "${module.alb.internal_alb_url}/payment-service"
+  backend_target_group_arn  = module.alb.backend_target_group_arn
+  payment_target_group_arn  = module.alb.payment_target_group_arn
+  movie_target_group_arn    = module.alb.movie_target_group_arn
   
   # S3 inputs
   s3_bucket_name = module.s3.bucket_name
@@ -47,7 +52,6 @@ module "alb" {
   # Networking inputs
   vpc_id                        = module.networking.vpc_id
   public_subnet_ids             = module.networking.public_subnet_ids
-  private_subnet_ids            = module.networking.private_subnet_ids
   alb_security_group_id         = module.networking.alb_security_group_id
   internal_alb_security_group_id = module.networking.internal_alb_security_group_id
   

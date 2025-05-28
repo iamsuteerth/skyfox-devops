@@ -1,9 +1,7 @@
-resource "random_id" "bucket_suffix" {
-  byte_length = 4
-}
-
 resource "aws_s3_bucket" "profile_images" {
-  bucket = "${var.project_name}-${var.environment}-profile-images-${random_id.bucket_suffix.hex}"
+  bucket = "${var.project_name}-${var.environment}-profile-images"
+
+  force_destroy = true
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-profile-images"

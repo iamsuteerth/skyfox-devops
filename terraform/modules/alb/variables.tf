@@ -19,11 +19,6 @@ variable "public_subnet_ids" {
   type        = list(string)
 }
 
-variable "private_subnet_ids" {
-  description = "Private subnet IDs for internal ALB"
-  type        = list(string)
-}
-
 # Security group inputs
 variable "alb_security_group_id" {
   description = "Security group ID for external ALB"

@@ -22,6 +22,8 @@ resource "aws_launch_template" "ecs" {
 
   vpc_security_group_ids = [var.ecs_instance_security_group_id]
 
+  key_name = var.key_pair_name
+
   iam_instance_profile {
     name = aws_iam_instance_profile.ecs_instance_profile.name
   }
@@ -49,7 +51,7 @@ resource "aws_launch_template" "ecs" {
 
 resource "aws_autoscaling_group" "ecs" {
   name                = "${var.project_name}-${var.environment}-ecs-asg"
-  vpc_zone_identifier = concat(var.public_subnet_ids, var.private_subnet_ids)
+  vpc_zone_identifier = var.public_subnet_ids 
   
   min_size         = var.min_capacity
   max_size         = var.max_capacity

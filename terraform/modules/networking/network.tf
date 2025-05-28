@@ -39,22 +39,6 @@ resource "aws_subnet" "public" {
   }
 }
 
-# Private Subnets
-resource "aws_subnet" "private" {
-  count = length(var.private_subnet_cidrs)
-
-  vpc_id            = aws_vpc.main.id
-  cidr_block        = var.private_subnet_cidrs[count.index]
-  availability_zone = var.availability_zones[count.index]
-
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-private-subnet-${count.index + 1}"
-    Environment = var.environment
-    Project     = var.project_name
-    Type        = "Private"
-  }
-}
-
 # Route Table for Public Subnets
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
@@ -71,31 +55,12 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Route Table for Private Subnets
-resource "aws_route_table" "private" {
-  vpc_id = aws_vpc.main.id
-
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-private-rt"
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
-
 # Associate Public Subnets with Public Route Table
 resource "aws_route_table_association" "public" {
   count = length(aws_subnet.public)
 
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
-}
-
-# Associate Private Subnets with Private Route Table
-resource "aws_route_table_association" "private" {
-  count = length(aws_subnet.private)
-
-  subnet_id      = aws_subnet.private[count.index].id
-  route_table_id = aws_route_table.private.id
 }
 
 # ALB Security Group - Allow HTTP from Internet
@@ -313,6 +278,23 @@ resource "aws_security_group" "ecs_instance" {
     to_port         = var.movie_port
     protocol        = "tcp"
     security_groups = [aws_security_group.movie.id]
+  }
+
+  # Dynamic port ranges for ALB communication
+  ingress {
+    description     = "Dynamic ports from External ALB"
+    from_port       = 32768
+    to_port         = 65535
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb.id]
+  }
+
+  ingress {
+    description     = "Dynamic ports from Internal ALB"
+    from_port       = 32768
+    to_port         = 65535
+    protocol        = "tcp"
+    security_groups = [aws_security_group.internal_alb.id]
   }
 
   # SSH access
