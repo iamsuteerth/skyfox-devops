@@ -239,13 +239,17 @@ resource "aws_ecs_task_definition" "backend" {
         {
           name      = "PAYMENT_GATEWAY_API_KEY"
           valueFrom = "/skyfox-backend/payment-gateway-api-key"
+        },
+        {
+          name = "API_GATEWAY_KEY"
+          valueFrom = "/skyfox-backend/api-gateway-key"
         }
       ]
 
       healthCheck = {
         command = [
           "CMD-SHELL",
-          "curl -f http://localhost:${var.backend_port}/health || exit 1"
+          "wget -qO- http://localhost:${var.backend_port}/health || exit 1"
         ]
         interval    = 30
         retries     = 3

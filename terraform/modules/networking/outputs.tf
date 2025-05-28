@@ -28,21 +28,6 @@ output "internal_alb_security_group_id" {
   value       = aws_security_group.internal_alb.id
 }
 
-output "backend_security_group_id" {
-  description = "ID of the backend security group"
-  value       = aws_security_group.backend.id
-}
-
-output "payment_security_group_id" {
-  description = "ID of the payment security group"
-  value       = aws_security_group.payment.id
-}
-
-output "movie_security_group_id" {
-  description = "ID of the movie security group"
-  value       = aws_security_group.movie.id
-}
-
 output "ecs_instance_security_group_id" {
   description = "ID of the ECS instance security group"
   value       = aws_security_group.ecs_instance.id

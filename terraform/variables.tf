@@ -15,3 +15,9 @@ variable "aws_region" {
   type        = string
   default     = "ap-south-1"
 }
+
+variable "deploy_services" {
+  description = "Deploy ECS services"
+  type        = bool
+  default     = false
+}

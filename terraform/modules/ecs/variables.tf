@@ -19,21 +19,6 @@ variable "public_subnet_ids" {
   type        = list(string)
 }
 
-variable "backend_security_group_id" {
-  description = "Security group ID for backend service"
-  type        = string
-}
-
-variable "payment_security_group_id" {
-  description = "Security group ID for payment service"
-  type        = string
-}
-
-variable "movie_security_group_id" {
-  description = "Security group ID for movie service"
-  type        = string
-}
-
 variable "ecs_instance_security_group_id" {
   description = "Security group ID for ECS instances"
   type        = string

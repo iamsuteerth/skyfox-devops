@@ -68,7 +68,6 @@ resource "aws_security_group" "alb" {
   name_prefix = "${var.project_name}-${var.environment}-alb-"
   vpc_id      = aws_vpc.main.id
 
-  # HTTP ingress
   ingress {
     description = "HTTP"
     from_port   = 80
@@ -77,19 +76,6 @@ resource "aws_security_group" "alb" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # HTTPS ingress (if enabled)
-  dynamic "ingress" {
-    for_each = var.enable_https ? [1] : []
-    content {
-      description = "HTTPS"
-      from_port   = 443
-      to_port     = 443
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
-    }
-  }
-
-  # All outbound traffic
   egress {
     description = "All outbound"
     from_port   = 0
@@ -115,24 +101,6 @@ resource "aws_security_group" "internal_alb" {
   name_prefix = "${var.project_name}-${var.environment}-internal-alb-"
   vpc_id      = aws_vpc.main.id
 
-  # HTTP from backend service only
-  ingress {
-    description     = "HTTP from backend"
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    security_groups = [aws_security_group.backend.id]
-  }
-
-  # All outbound to reach payment/movie services
-  egress {
-    description = "All outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = {
     Name        = "${var.project_name}-${var.environment}-internal-alb-sg"
     Environment = var.environment
@@ -145,175 +113,10 @@ resource "aws_security_group" "internal_alb" {
   }
 }
 
-# Backend Service Security Group
-resource "aws_security_group" "backend" {
-  name_prefix = "${var.project_name}-${var.environment}-backend-"
-  vpc_id      = aws_vpc.main.id
-
-  # Backend port from ALB
-  ingress {
-    description     = "Backend API"
-    from_port       = var.backend_port
-    to_port         = var.backend_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  # All outbound (for Supabase connectivity)
-  egress {
-    description = "All outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-backend-sg"
-    Environment = var.environment
-    Project     = var.project_name
-    Purpose     = "Backend Service"
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Payment Service Security Group
-resource "aws_security_group" "payment" {
-  name_prefix = "${var.project_name}-${var.environment}-payment-"
-  vpc_id      = aws_vpc.main.id
-
-  # Payment port from ALB only
-  ingress {
-    description     = "Payment API"
-    from_port       = var.payment_port
-    to_port         = var.payment_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.internal_alb.id]
-  }
-
-  # No outbound internet (internal service only)
-  egress {
-    description = "Internal VPC"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [var.vpc_cidr]
-  }
-
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-payment-sg"
-    Environment = var.environment
-    Project     = var.project_name
-    Purpose     = "Payment Service"
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Movie Service Security Group
-resource "aws_security_group" "movie" {
-  name_prefix = "${var.project_name}-${var.environment}-movie-"
-  vpc_id      = aws_vpc.main.id
-
-  # Movie port from ALB only
-  ingress {
-    description     = "Movie API"
-    from_port       = var.movie_port
-    to_port         = var.movie_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.internal_alb.id]
-  }
-
-  # No outbound internet (internal service only)
-  egress {
-    description = "Internal VPC"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [var.vpc_cidr]
-  }
-
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-movie-sg"
-    Environment = var.environment
-    Project     = var.project_name
-    Purpose     = "Movie Service"
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
 # ECS Instance Security Group
 resource "aws_security_group" "ecs_instance" {
   name_prefix = "${var.project_name}-${var.environment}-ecs-"
   vpc_id      = aws_vpc.main.id
-
-  # Allow traffic from service security groups
-  ingress {
-    description     = "Backend traffic"
-    from_port       = var.backend_port
-    to_port         = var.backend_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.backend.id]
-  }
-
-  ingress {
-    description     = "Payment traffic"
-    from_port       = var.payment_port
-    to_port         = var.payment_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.payment.id]
-  }
-
-  ingress {
-    description     = "Movie traffic"
-    from_port       = var.movie_port
-    to_port         = var.movie_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.movie.id]
-  }
-
-  # Dynamic port ranges for ALB communication
-  ingress {
-    description     = "Dynamic ports from External ALB"
-    from_port       = 32768
-    to_port         = 65535
-    protocol        = "tcp"
-    security_groups = [aws_security_group.alb.id]
-  }
-
-  ingress {
-    description     = "Dynamic ports from Internal ALB"
-    from_port       = 32768
-    to_port         = 65535
-    protocol        = "tcp"
-    security_groups = [aws_security_group.internal_alb.id]
-  }
-
-  # SSH access
-  ingress {
-    description = "SSH"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # All outbound
-  egress {
-    description = "All outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-ecs-instances-sg"
@@ -325,4 +128,84 @@ resource "aws_security_group" "ecs_instance" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+resource "aws_security_group_rule" "internal_alb_ingress" {
+  type                     = "ingress"
+  from_port                = 80
+  to_port                  = 80
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.ecs_instance.id
+  security_group_id        = aws_security_group.internal_alb.id
+  description              = "HTTP from ECS instances"
+}
+
+resource "aws_security_group_rule" "internal_alb_egress" {
+  type                     = "egress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  source_security_group_id = aws_security_group.ecs_instance.id
+  security_group_id        = aws_security_group.internal_alb.id
+  description              = "All outbound to ECS instances"
+}
+
+resource "aws_security_group_rule" "ecs_ingress_external_alb" {
+  type                     = "ingress"
+  from_port                = 32768
+  to_port                  = 65535
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.alb.id
+  security_group_id        = aws_security_group.ecs_instance.id
+  description              = "Dynamic ports from External ALB"
+}
+
+resource "aws_security_group_rule" "ecs_ingress_internal_alb" {
+  type                     = "ingress"
+  from_port                = 32768
+  to_port                  = 65535
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.internal_alb.id
+  security_group_id        = aws_security_group.ecs_instance.id
+  description              = "Dynamic ports from Internal ALB"
+}
+
+resource "aws_security_group_rule" "ecs_ingress_ssh" {
+  type              = "ingress"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.ecs_instance.id
+  description       = "SSH access"
+}
+
+resource "aws_security_group_rule" "ecs_egress_internal_alb" {
+  type                     = "egress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  source_security_group_id = aws_security_group.internal_alb.id
+  security_group_id        = aws_security_group.ecs_instance.id
+  description              = "All outbound to Internal ALB"
+}
+
+resource "aws_security_group_rule" "ecs_egress_external_alb" {
+  type                     = "egress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  source_security_group_id = aws_security_group.alb.id
+  security_group_id        = aws_security_group.ecs_instance.id
+  description              = "All outbound to External ALB"
+}
+
+resource "aws_security_group_rule" "ecs_egress_internet" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.ecs_instance.id
+  description       = "All outbound to internet"
 }

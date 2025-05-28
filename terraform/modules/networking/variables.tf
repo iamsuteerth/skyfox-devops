@@ -31,21 +31,3 @@ variable "enable_https" {
   type        = bool
   default     = false
 }
-
-variable "backend_port" {
-  description = "Port for backend service"
-  type        = number
-  default     = 8080
-}
-
-variable "payment_port" {
-  description = "Port for payment service"
-  type        = number
-  default     = 8082
-}
-
-variable "movie_port" {
-  description = "Port for movie service"
-  type        = number
-  default     = 4567
-}

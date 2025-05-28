@@ -21,9 +21,6 @@ module "ecs" {
   # Networking inputs
   vpc_id                        = module.networking.vpc_id
   public_subnet_ids             = module.networking.public_subnet_ids
-  backend_security_group_id     = module.networking.backend_security_group_id
-  payment_security_group_id     = module.networking.payment_security_group_id
-  movie_security_group_id       = module.networking.movie_security_group_id
   ecs_instance_security_group_id = module.networking.ecs_instance_security_group_id
 
   # EC2 Key Pair
@@ -41,6 +38,8 @@ module "ecs" {
   
   # S3 inputs
   s3_bucket_name = module.s3.bucket_name
+
+  deploy_services = var.deploy_services
 }
 
 module "alb" {

@@ -196,7 +196,7 @@ resource "aws_lb_listener_rule" "payment" {
 # Routes /movie-service/* to movie service
 resource "aws_lb_listener_rule" "movie" {
   listener_arn = aws_lb_listener.internal.arn
-  priority     = 200  # Higher number = lower priority
+  priority     = 200 
 
   action {
     type             = "forward"
