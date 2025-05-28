@@ -57,6 +57,9 @@ terraform/
     ├── networking/      # VPC, subnets, security groups
     ├── ecr/             # Docker repositories  
     ├── ecs/             # Container platform
+    │   ├── asg.tf       # Auto scaling configuration
+    │   ├── services.tf  # ECS service definitions
+    │   └── tasks.tf     # Task definitions
     ├── alb/             # Load balancers
     └── s3/              # Profile image storage
 ```
@@ -104,35 +107,83 @@ aws ssm put-parameter --name "/skyfox-backend/api-gateway-key" --value "your-api
 bucket = "skyfox-devprod-profile-images-your-unique-suffix"
 ```
 
-### 4. Two-Phase Deployment
+### 4. Controlled Deployment Strategy
 
-**Phase 1: Deploy Infrastructure Only**
+**Phase 1: Infrastructure Only**
 ```bash
 cd terraform
 terraform init
 terraform plan
-terraform apply  # Deploys infrastructure without ECS services
+terraform apply  # Deploys VPC, ALB, ECR, S3 without ECS services
 ```
 
-**Phase 2: Build and Push Images**
+**Phase 2: Build and Push Container Images**
 ```bash
 # Login to ECR
 aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin [account].dkr.ecr.ap-south-1.amazonaws.com
 
-# Build ARM64 images
+# Build and push ARM64 images with version tags
 docker buildx build --platform linux/arm64 \
   --tag [account].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-backend:latest \
+  --tag [account].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-backend:v1.0 \
   --push .
 ```
 
-**Phase 3: Deploy Services**
+**Phase 3: Launch ECS Services with Auto Scaling (Production Ready)**
 ```bash
-terraform apply -var="deploy_services=true"  # Deploys ECS services after images are available
+terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true"
+```
+
+**Phase 4: Full Production Launch**
+```bash
+terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="force_deployment=true"
+```
+
+### 5. Deployment Control Variables
+
+**Available deployment options:**
+```bash
+# Infrastructure only
+terraform apply
+
+# Services without auto scaling
+terraform apply -var="deploy_services=true"
+
+# Services with auto scaling
+terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true"
+
+# Deploy specific image version
+terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="image_tag=v1.1"
+
+# Force service restart
+terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="force_deployment=true"
 ```
 
 **Important**: Services require the `deploy_services=true` variable to ensure ECS services are only created after container images are pushed to ECR. This prevents service deployment failures due to missing images.
 
-## Takeaways
+## Auto Scaling Configuration
+
+### Service-Level Scaling
+**CPU and Memory Based:**
+- **Scale Out**: When CPU > 70% OR Memory > 80%
+- **Scale In**: When CPU  80%
+- **Scale In**: When cluster memory reservation < 30%
+- **Range**: 2-4 EC2 instances (t4g.small ARM64)
+
+### Deployment Strategy
+**Resource-Aware Rolling Updates:**
+  ```hcl
+  deployment_maximum_percent         = 100  # Never exceed desired count
+  deployment_minimum_healthy_percent = 50   # Allow 50% capacity during updates
+  ```
+
+**Why 100/50 Strategy:**
+- **Resource Constrained**: 2 t4g.small instances with limited capacity
+- **Cost Efficient**: No temporary over-provisioning during updates
+- **Acceptable Trade-off**: Brief 50% capacity reduction vs infrastructure costs
+- **Circuit Breaker Protection**: Automatic rollback if deployment fails
+
+## What We Learned
 
 ### Terraform Patterns
 - **Module organization**: Clean separation of networking, compute, and storage
@@ -159,12 +210,18 @@ terraform apply -var="deploy_services=true"  # Deploys ECS services after images
 
 ### Network Security & Access
 - **ECS internet access**: Required for AWS services (ECR, Parameter Store, CloudWatch)
-- **Security group isolation**: Network boundaries maintained through security groups
+- **Security group isolation**: Network boundaries maintained through security groups, not subnet complexity
 - **ALB communication**: Internal ALB restricted to ECS instances while maintaining service isolation
+
+### Service Update & Deployment Management
+- **Dynamic image tags**: Version-specific deployments instead of `:latest` for production
+- **Force deployment capability**: Manual override for immediate service restarts
+- **Circuit breakers**: Automatic rollback protection for failed deployments
+- **Trigger mechanisms**: SHA-based detection of task definition changes
 
 ### Frontend URL Management
 - **Challenge**: ALB DNS names contain random identifiers that change on infrastructure recreation
-- **Solution**: Environment variable injection in CI/CD pipeline to dynamically configure frontend URLs
+- **Solution**: Environment variable injection to configure frontend's backend configuration
 - **Options**: Vercel environment variables, Parameter Store, or custom domain with Route 53
 - **Learning**: Infrastructure URLs should be dynamic, not hardcoded in frontend applications
 
@@ -173,6 +230,12 @@ terraform apply -var="deploy_services=true"  # Deploys ECS services after images
 - **Hit placement constraint deadlock**: Services couldn't find appropriate instances
 - **Simplified to elegant solution**: All services in public subnets with security group isolation
 - **Resource efficiency**: Single Auto Scaling Group instead of multiple dedicated groups
+
+### Production Readiness Considerations
+- **Circuit Breakers**: Prevent bad deployments from affecting healthy services
+- **Auto Scaling**: Both service-level and instance-level scaling implemented
+- **Monitoring**: CloudWatch logging enabled, Container Insights activated
+- **Cost Optimization**: ARM64 instances, lifecycle policies, and resource right-sizing
 
 ### Security & Operations
 - **Parameter Store**: Secure secret management with runtime injection
@@ -190,4 +253,4 @@ terraform apply -var="deploy_services=true"  # Deploys ECS services after images
 - **Resource sharing**: Single infrastructure serving multiple services
 
 ---
-**Status**: Complete microservices platform with load balancing and storage - Ready for CI/CD integration with GoCD
+**Status**: Production-grade microservices platform with auto scaling, circuit breakers, and controlled deployment capabilities - Complete infrastructure foundation ready for application development.

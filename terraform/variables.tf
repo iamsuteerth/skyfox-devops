@@ -21,3 +21,21 @@ variable "deploy_services" {
   type        = bool
   default     = false
 }
+
+variable "enable_auto_scaling" {
+  description = "Enable auto scaling for ECS services"
+  type        = bool
+  default     = false
+}
+
+variable "force_deployment" {
+  description = "Force new deployment of ECS services"
+  type        = bool
+  default     = false
+}
+
+variable "image_tag" {
+  description = "Container image tag"
+  type        = string
+  default     = "latest"
+}

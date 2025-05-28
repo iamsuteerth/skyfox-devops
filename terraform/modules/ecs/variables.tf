@@ -188,3 +188,58 @@ variable "movie_target_group_arn" {
   description = "ARN of the movie target group"
   type        = string
 }
+
+# Auto Scaling Configuration
+variable "enable_auto_scaling" {
+  description = "Enable auto scaling for ECS services"
+  type        = bool
+  default     = false
+}
+
+variable "backend_cpu_target" {
+  description = "Target CPU utilization for backend auto scaling"
+  type        = number
+  default     = 70
+}
+
+variable "backend_memory_target" {
+  description = "Target memory utilization for backend auto scaling"
+  type        = number
+  default     = 80
+}
+
+variable "payment_cpu_target" {
+  description = "Target CPU utilization for payment auto scaling"
+  type        = number
+  default     = 70
+}
+
+variable "payment_memory_target" {
+  description = "Target memory utilization for payment auto scaling"
+  type        = number
+  default     = 80
+}
+
+variable "movie_cpu_target" {
+  description = "Target CPU utilization for movie auto scaling"
+  type        = number
+  default     = 70
+}
+
+variable "movie_memory_target" {
+  description = "Target memory utilization for movie auto scaling"
+  type        = number
+  default     = 80
+}
+
+variable "force_deployment" {
+  description = "Force new deployment of ECS services"
+  type        = bool
+  default     = false
+}
+
+variable "image_tag" {
+  description = "Container image tag"
+  type        = string
+  default     = "latest"
+}

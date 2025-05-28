@@ -40,6 +40,9 @@ module "ecs" {
   s3_bucket_name = module.s3.bucket_name
 
   deploy_services = var.deploy_services
+  enable_auto_scaling = var.enable_auto_scaling
+  force_deployment = var.force_deployment
+  image_tag       = var.image_tag
 }
 
 module "alb" {
