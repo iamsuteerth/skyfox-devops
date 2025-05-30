@@ -46,6 +46,11 @@ Backend Service → Internal ALB → /payment-service/* → Payment Service
 - **Parameter Store**: JWT secrets, API keys, database URLs
 - **IAM roles**: Least-privilege access for each service
 
+### Monitoring & Observability
+- **AWS Managed Prometheus**: Scalable metrics storage and querying
+- **Prometheus metrics**: API performance monitoring with endpoint grouping
+- **Parameter Store integration**: AMP workspace discovery for ADOT collectors
+
 ## Repository Structure
 
 ```
@@ -61,7 +66,8 @@ terraform/
     │   ├── services.tf  # ECS service definitions
     │   └── tasks.tf     # Task definitions
     ├── alb/             # Load balancers
-    └── s3/              # Profile image storage
+    ├── s3/              # Profile image storage
+    └── prometheus/      # AWS Managed Prometheus workspace
 ```
 
 ## Deployment
@@ -114,7 +120,7 @@ bucket = "skyfox-devprod-profile-images-your-unique-suffix"
 cd terraform
 terraform init
 terraform plan
-terraform apply  # Deploys VPC, ALB, ECR, S3 without ECS services
+terraform apply  # Deploys VPC, ALB, ECR, S3, AMP without ECS services and ASG
 ```
 
 **Phase 2: Build and Push Container Images**
@@ -127,6 +133,8 @@ docker buildx build --platform linux/arm64 \
   --tag [account].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-backend:latest \
   --tag [account].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-backend:v1.0 \
   --push .
+
+# Repeat for payment and movie services
 ```
 
 **Phase 3: Launch ECS Services with Auto Scaling (Production Ready)**
@@ -134,14 +142,46 @@ docker buildx build --platform linux/arm64 \
 terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true"
 ```
 
-**Phase 4: Full Production Launch**
+### 5. Advanced Deployment Control
+
+**Per-Service Image Deployment:**
 ```bash
+# Update only backend service
+terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="backend_image_tag=v2.1.0"
+
+# Update multiple services with different versions
+terraform apply \
+  -var="deploy_services=true" \
+  -var="enable_auto_scaling=true" \
+  -var="backend_image_tag=v2.1.0" \
+  -var="payment_image_tag=v1.5.2"
+
+# Mixed development deployment
+terraform apply \
+  -var="deploy_services=true" \
+  -var="enable_auto_scaling=true" \
+  -var="backend_image_tag=dev-build-123" \
+  -var="payment_image_tag=v1.0.0" \
+  -var="movie_image_tag=v1.0.0"
+```
+
+**Per-Service Force Deployment:**
+```bash
+# Force restart only backend service
+terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="force_backend_deployment=true"
+
+# Force restart specific service with new image
+terraform apply \
+  -var="deploy_services=true" \ 
+  -var="enable_auto_scaling=true" \
+  -var="backend_image_tag=v2.0.0" \
+  -var="force_backend_deployment=true"
+
+# Emergency restart of all services
 terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="force_deployment=true"
 ```
 
-### 5. Deployment Control Variables
-
-**Available deployment options:**
+**Available deployment variables:**
 ```bash
 # Infrastructure only
 terraform apply
@@ -152,11 +192,15 @@ terraform apply -var="deploy_services=true"
 # Services with auto scaling
 terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true"
 
-# Deploy specific image version
-terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="image_tag=v1.1"
+# Per-service image control
+-var="backend_image_tag=v1.1"
+-var="payment_image_tag=v1.2"
+-var="movie_image_tag=v1.3"
 
-# Force service restart
-terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="force_deployment=true"
+# Per-service force deployment
+-var="force_backend_deployment=true"
+-var="force_payment_deployment=true"
+-var="force_movie_deployment=true"
 ```
 
 **Important**: Services require the `deploy_services=true` variable to ensure ECS services are only created after container images are pushed to ECR. This prevents service deployment failures due to missing images.
@@ -172,10 +216,10 @@ terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var
 
 ### Deployment Strategy
 **Resource-Aware Rolling Updates:**
-  ```hcl
-  deployment_maximum_percent         = 100  # Never exceed desired count
-  deployment_minimum_healthy_percent = 50   # Allow 50% capacity during updates
-  ```
+```bash
+deployment_maximum_percent         = 100  # Never exceed desired count
+deployment_minimum_healthy_percent = 50   # Allow 50% capacity during updates
+```
 
 **Why 100/50 Strategy:**
 - **Resource Constrained**: 2 t4g.small instances with limited capacity
@@ -214,10 +258,11 @@ terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var
 - **ALB communication**: Internal ALB restricted to ECS instances while maintaining service isolation
 
 ### Service Update & Deployment Management
-- **Dynamic image tags**: Version-specific deployments instead of `:latest` for production
-- **Force deployment capability**: Manual override for immediate service restarts
+- **Per-service image tags**: Independent versioning for each service (backend, payment, movie)
+- **Per-service force deployment**: Individual service restart capability  
+- **SHA-based auto-deployment**: Automatic updates when task definitions change
 - **Circuit breakers**: Automatic rollback protection for failed deployments
-- **Trigger mechanisms**: SHA-based detection of task definition changes
+- **Fine-grained control**: Deploy services independently with different versions
 
 ### Frontend URL Management
 - **Challenge**: ALB DNS names contain random identifiers that change on infrastructure recreation
@@ -236,12 +281,14 @@ terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var
 - **Auto Scaling**: Both service-level and instance-level scaling implemented
 - **Monitoring**: CloudWatch logging enabled, Container Insights activated
 - **Cost Optimization**: ARM64 instances, lifecycle policies, and resource right-sizing
+- **Deployment flexibility**: Per-service versioning and rolling update strategies
 
 ### Security & Operations
 - **Parameter Store**: Secure secret management with runtime injection
 - **Security groups**: Network isolation without subnet complexity
 - **Cost optimization**: ARM64 instances and lifecycle policies
 - **Environment variable management**: Separation of sensitive and non-sensitive config
+- **Operational excellence**: Fine-grained deployment control for debugging and maintenance
 
 ### Key Problem Solved
 **Placement Constraint Deadlock**: Initially designed with private subnets and complex placement constraints that prevented services from finding suitable instances. Simplified to public-only subnets with security group isolation, maintaining security while eliminating deployment complexity.
@@ -253,4 +300,4 @@ terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var
 - **Resource sharing**: Single infrastructure serving multiple services
 
 ---
-**Status**: Production-grade microservices platform with auto scaling, circuit breakers, and controlled deployment capabilities - Complete infrastructure foundation ready for application development.
+**Status**: Production-grade microservices platform with auto scaling, circuit breakers, per-service deployment control, and observability foundation - Complete infrastructure ready for advanced monitoring and application development.

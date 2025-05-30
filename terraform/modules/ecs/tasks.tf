@@ -10,7 +10,7 @@ resource "aws_ecs_task_definition" "payment" {
   container_definitions = jsonencode([
     {
       name      = "payment"
-      image = "${var.repository_urls["payment-service"]}:${var.image_tag}"
+      image = "${var.repository_urls["payment-service"]}:${var.payment_image_tag}"
       cpu       = var.payment_cpu
       memory    = var.payment_memory
       essential = true
@@ -93,7 +93,7 @@ resource "aws_ecs_task_definition" "movie" {
   container_definitions = jsonencode([
     {
       name      = "movie"
-      image = "${var.repository_urls["movie-service"]}:${var.image_tag}"
+      image = "${var.repository_urls["movie-service"]}:${var.movie_image_tag}"
       cpu       = var.movie_cpu
       memory    = var.movie_memory
       essential = true
@@ -181,7 +181,7 @@ resource "aws_ecs_task_definition" "backend" {
   container_definitions = jsonencode([
     {
       name      = "backend"
-      image = "${var.repository_urls["backend"]}:${var.image_tag}"
+      image = "${var.repository_urls["backend"]}:${var.backend_image_tag}"
       cpu       = var.backend_cpu
       memory    = var.backend_memory
       essential = true

@@ -41,8 +41,15 @@ module "ecs" {
 
   deploy_services = var.deploy_services
   enable_auto_scaling = var.enable_auto_scaling
+
+  backend_image_tag = var.backend_image_tag
+  payment_image_tag = var.payment_image_tag
+  movie_image_tag   = var.movie_image_tag
+
+  force_backend_deployment = var.force_backend_deployment
+  force_payment_deployment = var.force_payment_deployment
+  force_movie_deployment   = var.force_movie_deployment
   force_deployment = var.force_deployment
-  image_tag       = var.image_tag
 }
 
 module "alb" {
@@ -62,6 +69,13 @@ module "alb" {
 }
 module "s3" {
   source = "./modules/s3"
+  
+  project_name = var.project_name
+  environment  = var.environment
+}
+
+module "prometheus" {
+  source = "./modules/prometheus"
   
   project_name = var.project_name
   environment  = var.environment

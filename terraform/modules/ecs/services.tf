@@ -18,7 +18,7 @@ resource "aws_ecs_service" "backend" {
     redeployment = sha1(jsonencode(aws_ecs_task_definition.backend.revision))
   }
   
-  force_new_deployment = var.force_deployment
+  force_new_deployment = var.force_deployment || var.force_backend_deployment
 
   deployment_circuit_breaker {
     enable   = true
@@ -59,7 +59,7 @@ resource "aws_ecs_service" "payment" {
     redeployment = sha1(jsonencode(aws_ecs_task_definition.payment.revision))
   }
   
-  force_new_deployment = var.force_deployment
+  force_new_deployment = var.force_deployment || var.force_payment_deployment
 
   deployment_circuit_breaker {
     enable   = true
@@ -99,7 +99,7 @@ resource "aws_ecs_service" "movie" {
     redeployment = sha1(jsonencode(aws_ecs_task_definition.movie.revision))
   }
   
-  force_new_deployment = var.force_deployment
+  force_new_deployment = var.force_deployment || var.force_movie_deployment
 
   load_balancer {
     target_group_arn = var.movie_target_group_arn

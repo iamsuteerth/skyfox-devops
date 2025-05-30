@@ -232,14 +232,44 @@ variable "movie_memory_target" {
   default     = 80
 }
 
-variable "force_deployment" {
-  description = "Force new deployment of ECS services"
+variable "force_backend_deployment" {
+  description = "Force new deployment of backend service only"
   type        = bool
   default     = false
 }
 
-variable "image_tag" {
-  description = "Container image tag"
+variable "force_payment_deployment" {
+  description = "Force new deployment of payment service only"
+  type        = bool
+  default     = false
+}
+
+variable "force_movie_deployment" {
+  description = "Force new deployment of movie service only"
+  type        = bool
+  default     = false
+}
+
+variable "force_deployment" {
+  description = "Force new deployment of ALL services"
+  type        = bool
+  default     = false
+}
+
+variable "backend_image_tag" {
+  description = "Container image tag for backend service"
+  type        = string
+  default     = "latest"
+}
+
+variable "payment_image_tag" {
+  description = "Container image tag for payment service"
+  type        = string
+  default     = "latest"
+}
+
+variable "movie_image_tag" {
+  description = "Container image tag for movie service"
   type        = string
   default     = "latest"
 }

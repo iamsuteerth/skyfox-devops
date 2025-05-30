@@ -92,3 +92,13 @@ output "s3_bucket_arn" {
   description = "ARN of the S3 bucket"
   value       = module.s3.bucket_arn
 }
+
+output "prometheus_workspace_endpoint" {
+  description = "AWS Managed Prometheus query endpoint"
+  value       = module.prometheus.workspace_endpoint
+}
+
+output "prometheus_workspace_id" {
+  description = "AWS Managed Prometheus workspace ID"
+  value       = module.prometheus.workspace_id
+}
