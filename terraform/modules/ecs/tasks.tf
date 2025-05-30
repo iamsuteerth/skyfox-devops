@@ -175,8 +175,20 @@ resource "aws_ecs_task_definition" "backend" {
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
   task_role_arn           = aws_iam_role.ecs_task_role.arn
 
-  cpu    = var.backend_cpu    
-  memory = var.backend_memory 
+  cpu    = var.backend_cpu + var.adot_cpu     
+  memory = var.backend_memory + var.adot_memory
+
+  volume {
+    name = "adot-config"
+    efs_volume_configuration {
+      file_system_id     = aws_efs_file_system.adot_config.id
+      transit_encryption = "ENABLED"
+      authorization_config {
+        access_point_id = aws_efs_access_point.adot_config.id
+        iam             = "ENABLED"
+      }
+    }
+  }
 
   container_definitions = jsonencode([
     {
@@ -238,7 +250,7 @@ resource "aws_ecs_task_definition" "backend" {
         },
         {
           name      = "PAYMENT_GATEWAY_API_KEY"
-          valueFrom = "/skyfox-backend/payment-gateway-api-key"
+        valueFrom = "/skyfox-backend/payment-gateway-api-key"
         },
         {
           name = "API_GATEWAY_KEY"
@@ -263,6 +275,51 @@ resource "aws_ecs_task_definition" "backend" {
           "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
           "awslogs-region"        = "ap-south-1"
           "awslogs-stream-prefix" = "backend"
+        }
+      }
+    },
+    {
+      name  = "adot-collector"
+      image = "public.ecr.aws/aws-observability/aws-otel-collector:latest"
+      
+      essential = false
+      cpu       = var.adot_cpu
+      memory    = var.adot_memory
+
+      environment = [
+        {
+          name  = "AWS_REGION"
+          value = "ap-south-1"
+        },
+        {
+          name  = "ECS_CLUSTER_NAME"
+          value = aws_ecs_cluster.main.name
+        },
+        {
+          name  = "ADOT_CONFIG_CONTENT"
+          value = local.adot_config  
+        }
+      ]
+      
+      secrets = [
+        {
+          name      = "AMP_ENDPOINT"
+          valueFrom = "/skyfox-backend/amp-endpoint"
+        },
+        {
+          name      = "AMP_WORKSPACE_ID"
+          valueFrom = "/skyfox-backend/amp-workspace-id"
+        }
+      ]
+
+      command = ["--config=env:ADOT_CONFIG_CONTENT"]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.ecs_logs.name
+          "awslogs-region"        = "ap-south-1"
+          "awslogs-stream-prefix" = "adot"
         }
       }
     }

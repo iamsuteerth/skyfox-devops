@@ -71,14 +71,27 @@ variable "desired_capacity" {
 variable "backend_cpu" {
   description = "CPU units for backend service (1024 = 1 vCPU)"
   type        = number
-  default     = 475  # 0.450 vCPU
+  default     = 896
 }
 
 variable "backend_memory" {
   description = "Memory for backend service in MiB"
   type        = number
-  default     = 819  # 0.8 GiB
+  default     = 832  # 0.8 GiB
 }
+
+variable "adot_cpu" {
+  description = "CPU units for ADOT sidecar "
+  type        = number
+  default = 128
+}
+
+variable "adot_memory" {
+  description = "Memory for ADOT sidecar in MiB"
+  type        = number
+  default     = 128  # 0.1 GiB
+}
+
 
 variable "backend_desired_count" {
   description = "Desired number of backend tasks"
@@ -95,13 +108,13 @@ variable "backend_max_capacity" {
 variable "payment_cpu" {
   description = "CPU units for payment service"
   type        = number
-  default     = 230  # 0.23 vCPU
+  default     = 384  
 }
 
 variable "payment_memory" {
   description = "Memory for payment service in MiB"
   type        = number
-  default     = 410  # 0.4 GiB
+  default     = 448  # 0.4 GiB
 }
 
 variable "payment_desired_count" {
@@ -119,13 +132,13 @@ variable "payment_max_capacity" {
 variable "movie_cpu" {
   description = "CPU units for movie service"
   type        = number
-  default     = 230  # 0.23 vCPU
+  default     = 384 
 }
 
 variable "movie_memory" {
   description = "Memory for movie service in MiB"
   type        = number
-  default     = 410  # 0.4 GiB
+  default     = 448  # 0.4 GiB
 }
 
 variable "movie_desired_count" {

@@ -42,3 +42,13 @@ output "ecs_task_role_arn" {
   description = "ECS task role ARN"
   value       = aws_iam_role.ecs_task_role.arn
 }
+
+output "efs_file_system_id" {
+  description = "EFS file system ID for ADOT configuration"
+  value       = aws_efs_file_system.adot_config.id
+}
+
+output "adot_config_parameter_name" {
+  description = "Parameter Store name for ADOT configuration"
+  value       = aws_ssm_parameter.adot_config.name
+}

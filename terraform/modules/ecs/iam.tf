@@ -156,3 +156,30 @@ resource "aws_iam_role_policy" "parameter_store_access" {
     ]
   })
 }
+
+# IAM policy for AMP access
+resource "aws_iam_policy" "amp_remote_write" {
+  name        = "${var.project_name}-${var.environment}-amp-remote-write"
+  description = "Policy for ADOT to write to AWS Managed Prometheus"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "aps:RemoteWrite"
+        ]
+        Resource = [
+          "arn:aws:aps:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:workspace/*"
+        ]
+      }
+    ]
+  })
+}
+
+# Attach to existing task role
+resource "aws_iam_role_policy_attachment" "ecs_task_amp" {
+  role       = aws_iam_role.ecs_task_role.name
+  policy_arn = aws_iam_policy.amp_remote_write.arn
+}

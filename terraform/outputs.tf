@@ -102,3 +102,18 @@ output "prometheus_workspace_id" {
   description = "AWS Managed Prometheus workspace ID"
   value       = module.prometheus.workspace_id
 }
+
+output "prometheus_workspace_arn" {
+  description = "AWS Managed Prometheus workspace ARN"
+  value       = module.prometheus.workspace_arn
+}
+
+output "adot_config_efs_id" {
+  description = "EFS file system ID for ADOT configuration"
+  value       = module.ecs.efs_file_system_id
+}
+
+output "adot_config_parameter" {
+  description = "Parameter Store name for ADOT configuration"
+  value       = module.ecs.adot_config_parameter_name
+}
