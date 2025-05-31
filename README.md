@@ -166,7 +166,8 @@ terraform apply \
 | `backend_image_tag` | Backend service image version | `v2.1.0` |
 | `payment_image_tag` | Payment service image version | `v1.5.2` |
 | `movie_image_tag` | Movie service image version | `v1.3.1` |
-| `force_*_deployment` | Force service restart | `true/false` |
+| `adot_image_tag` | ADOT Collector image version | `v1.0.2` |
+| `force_*_deployment` | Force service restart (adot requires backend service restart) | `true/false` |
 
 ## Monitoring Architecture
 
