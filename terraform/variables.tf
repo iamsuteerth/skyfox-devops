@@ -69,3 +69,9 @@ variable "movie_image_tag" {
   type        = string
   default     = "latest"
 }
+
+variable "adot_image_tag" {
+  description = "Container image tag for backend service adot collector"
+  type        = string
+  default     = "latest"
+}

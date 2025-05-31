@@ -1,5 +1,3 @@
-data "aws_caller_identity" "current" {}
-
 # Data source for ECS-optimized AMI
 data "aws_ami" "ecs_optimized" {
   most_recent = true

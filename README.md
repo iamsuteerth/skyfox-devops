@@ -1,97 +1,99 @@
 # SkyFox DevOps Infrastructure
 
-**A production-grade microservices platform on AWS using Terraform and ECS with enterprise monitoring.**
+**Production-grade microservices platform on AWS using Terraform and ECS with enterprise monitoring and observability.**
 
-## What I've Built
+## Overview
 
-SkyFox is a movie platform backend with three services:
+SkyFox is a movie platform backend with three core services deployed on AWS ECS:
 - **Backend Service** (8080): Main API with authentication and Supabase integration  
 - **Payment Service** (8082): Transaction processing
 - **Movie Service** (4567): Movie catalog management
 
 ## Architecture
+![Cloud Architecture Diagram](./AWS_Skyfox.png)
 
-```
-Internet → External ALB → Backend Service
-                       ↓
-Backend Service → Internal ALB → /payment-service/* → Payment Service
-                               → /movie-service/*   → Movie Service
-```
+**Key Design Decisions:**
+- **Public subnet deployment**: All services with internet access for operational simplicity
+- **Path-based routing**: Internal ALB routes requests based on `/payment-service/*` and `/movie-service/*` patterns
+- **Bridge networking**: ECS tasks use bridge mode for optimal resource utilization and sidecar monitoring
 
-**Traffic Flow:**
-- Frontend hits External ALB → Backend Service (public subnet)
-- Backend calls Internal ALB → Payment/Movie Services (public subnet)
-- Path-based routing: `/payment-service/*` and `/movie-service/*`
+## Cloud-Native Security Posture
+
+- **Zero Secret Sprawl:** Absolutely no application credentials or secrets are ever baked into container images, source code, or filesystems.
+- **Centralized Secret Management:** All sensitive values (database URLs, API keys, credentials) are securely stored in AWS SSM Parameter Store as encrypted `SecureString` parameters.
+- **Runtime Secret Injection:** At container launch, ECS fetches environment variables securely from SSM—no plaintext files, ever.
+- **Least Privilege IAM:** Service roles follow the principle of least privilege for accessing SSM and AWS APIs.
+- **Public-Facing, But Hardened:** Even though services run in public subnets, only whitelisted ports/protocols are exposed. Sensitive endpoints are protected both by the ALB and the application itself.
+- **Bot-Proof by Design:** All endpoints are protected by robust API key authentication. Frequent, automated internet scans for cloud keys, ENV files, or secrets are blocked and always receive 403 Forbidden.
+- **Defense-in-Depth:** Security groups, IAM roles, and ECS task permissions together create robust, layered defenses for all workloads.
+- **Thorough Logging for Audit:** All the activity is recorded and stored in `Cloudwatch` with specific streams for `container level`, `service level` and `task level` logs with `CloudWatch Alarms` setup for suspicious activity!
+
+> **Summary:**  
+> SkyFox DevOps is designed for cloud security from day one. Even if exposed to the public internet, application secrets are impossible to leak through classic endpoint scanning or image forensics.
 
 ## Infrastructure Components
 
-### Network Design
-- **VPC**: `10.0.0.0/16` across 3 availability zones
-- **Public subnets only**: All services with internet access for simplicity
-- **Security groups**: Layered access control between services
+### Network Architecture
+- **VPC**: `10.0.0.0/16` spanning 3 availability zones
+- **Public subnets only**: Simplified networking with security group-based isolation
+- **Security groups**: Three-layer approach (External ALB, Internal ALB, ECS Instances)
 
 ### Container Platform
-- **ECS Cluster**: 2-4 t4g.small ARM64 instances
-- **Single Auto Scaling Group**: All instances in public subnets
-- **Service placement**: Services distributed efficiently across instances
-- **ECR repositories**: Automated image lifecycle management
+- **ECS Cluster**: 2-4 t4g.small ARM64 instances with auto-scaling
+- **Service distribution**: Efficient placement across available instances
+- **Bridge networking**: Container-to-container communication within tasks
 
-### Load Balancing
-- **External ALB**: Internet-facing, routes to backend
-- **Internal ALB**: Service-to-service communication with path routing
-- **Health checks**: `/health`, `/pshealth`, `/mshealth` endpoints
-
-### Storage & Secrets
-- **S3 bucket**: Profile image storage with encryption
-- **Parameter Store**: JWT secrets, API keys, database URLs
-- **IAM roles**: Least-privilege access for each service
+### Load Balancing & Service Discovery
+- **External ALB**: Internet-facing for frontend traffic
+- **Internal ALB**: Service mesh alternative with path-based routing
+- **Health monitoring**: Custom endpoints (`/health`, `/pshealth`, `/mshealth`)
 
 ### Monitoring & Observability
-- **AWS Managed Prometheus**: Scalable metrics storage and querying
-- **ADOT Sidecar Collectors**: Prometheus metrics collection and forwarding
-- **API Performance Monitoring**: Request rates, response times, error tracking by endpoint groups
-- **EFS Configuration Management**: Centralized ADOT configuration storage
-- **Unique Instance Labeling**: Deployment tracking and metadata
+- **AWS Managed Prometheus (AMP)**: Centralized metrics storage
+- **ADOT Sidecar Pattern**: Per-task metrics collection and forwarding
+- **Container links resolution**: Enables `backend:8080` hostname resolution in bridge mode
+- **Unique deployment tracking**: Instance labeling with deployment IDs
 
 ## Repository Structure
 
 ```
 terraform/
-├── main.tf                # Module orchestration
-├── outputs.tf             # Infrastructure URLs and configs
-├── variables.tf           # Global settings
+├── main.tf                    # Module orchestration
+├── outputs.tf                 # Infrastructure URLs and configurations
+├── variables.tf               # Global settings and customization
 └── modules/
-    ├── networking/        # VPC, subnets, security groups
-    ├── ecr/               # Docker repositories  
-    ├── ecs/               # Container platform
-    │   ├── asg.tf         # Auto scaling configuration
-    │   ├── services.tf    # ECS service definitions
-    │   ├── tasks.tf       # Task definitions
-    │   └── adot-config.tf # ADOT monitoring configuration
-    ├── alb/               # Load balancers
-    ├── s3/                # Profile image storage
-    └── prometheus/        # AWS Managed Prometheus workspace
+    ├── networking/            # VPC, subnets, security groups
+    ├── ecr/                   # Docker repositories with lifecycle policies
+    ├── ecs/                   # Container platform and services
+    │   ├── asg.tf             # Auto Scaling Group configuration
+    │   ├── services.tf        # ECS service definitions
+    │   ├── tasks.tf           # Task definitions with sidecar monitoring
+    │   └── adot-config.tf     # ADOT monitoring configuration
+    ├── alb/                   # Application Load Balancers
+    ├── s3/                    # Profile image storage
+    └── prometheus/            # AWS Managed Prometheus workspace
 ```
 
-## Deployment
+## Quick Start
 
 ### Prerequisites
-```bash
-# AWS CLI configured
-# Terraform >= 1.0
-# Docker for building images
-```
+- AWS CLI configured with appropriate permissions
+- Terraform >= 1.0
+- Docker for container image building
 
-### 1. Remote State Setup
+### 1. Backend State Configuration
 ```bash
+# Create S3 bucket for Terraform state
 aws s3api create-bucket \
-  --bucket skyfox-terraform-state \
+  --bucket skyfox-terraform-state-${RANDOM_SUFFIX} \
   --create-bucket-configuration LocationConstraint=ap-south-1
 
+# Enable versioning
 aws s3api put-bucket-versioning \
-  --bucket skyfox-terraform-state \
+  --bucket skyfox-terraform-state-${RANDOM_SUFFIX} \
   --versioning-configuration Status=Enabled
 
+# Create DynamoDB table for state locking
 aws dynamodb create-table \
   --table-name skyfox-terraform-locks \
   --attribute-definitions AttributeName=LockID,AttributeType=S \
@@ -99,194 +101,172 @@ aws dynamodb create-table \
   --billing-mode PAY_PER_REQUEST
 ```
 
-### 2. Store Environment Variables
+### 2. Environment Configuration
 ```bash
+# Store application secrets in Parameter Store
 aws ssm put-parameter --name "/skyfox-backend/jwt-secret" --value "your-jwt-secret" --type "SecureString"
 aws ssm put-parameter --name "/skyfox-backend/database-url" --value "your-supabase-url" --type "SecureString"
 aws ssm put-parameter --name "/skyfox-backend/movie-service-api-key" --value "your-key" --type "SecureString"
 aws ssm put-parameter --name "/skyfox-backend/payment-gateway-api-key" --value "your-key" --type "SecureString"
 aws ssm put-parameter --name "/skyfox-backend/s3-bucket" --value "bucket-name" --type "SecureString"
-aws ssm put-parameter --name "/skyfox-backend/api-gateway-key" --value "your-api-gateway-key-value" --type "SecureString"
+aws ssm put-parameter --name "/skyfox-backend/api-gateway-key" --value "your-api-gateway-key" --type "SecureString"
 ```
 
-### 3. S3 Bucket Configuration
-**Important**: The S3 bucket name `skyfox-devprod-profile-images` might be taken globally. If deployment fails, update the bucket name in `modules/s3/main.tf`:
+### 3. Deployment Strategy
 
-```bash
-bucket = "skyfox-devprod-profile-images-your-unique-suffix"
-```
-
-### 4. Phased Deployment Strategy
-
-**Phase 1: Infrastructure Only**
+**Phase 1: Infrastructure Foundation**
 ```bash
 cd terraform
 terraform init
 terraform plan
-terraform apply  # Deploys VPC, ALB, ECR, S3, AMP without ECS services
+terraform apply  # Deploys VPC, ALB, ECR, S3, AMP
 ```
 
-**Phase 2: Build and Push Container Images**
+**Phase 2: Container Images**
 ```bash
-# Login to ECR
-aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin [account].dkr.ecr.ap-south-1.amazonaws.com
+# ECR authentication
+aws ecr get-login-password --region ap-south-1 | \
+  docker login --username AWS --password-stdin ${ACCOUNT_ID}.dkr.ecr.ap-south-1.amazonaws.com
 
-# Build and push ARM64 images with version tags
+# Build and push ARM64 images
 docker buildx build --platform linux/arm64 \
-  --tag [account].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-backend:latest \
-  --tag [account].dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-backend:prometheus-v1 \
+  --tag ${ACCOUNT_ID}.dkr.ecr.ap-south-1.amazonaws.com/skyfox-devprod-backend:latest \
   --push .
-
-# Repeat for payment and movie services
 ```
 
-**Phase 3: Launch ECS Services with Auto Scaling**
+**Phase 3: Service Deployment**
 ```bash
+# Deploy services with auto-scaling
 terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true"
 ```
 
-### 5. Advanced Deployment Control
+## Advanced Deployment Options
 
-**Per-Service Image Deployment:**
+### Per-Service Version Control
 ```bash
-# Update only backend service
-terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="backend_image_tag=prometheus-v1"
-
-# Update multiple services with different versions
+# Deploy specific service versions
 terraform apply \
   -var="deploy_services=true" \
   -var="enable_auto_scaling=true" \
-  -var="backend_image_tag=prometheus-v1" \
-  -var="payment_image_tag=v1.5.2"
+  -var="backend_image_tag=v2.1.0" \
+  -var="payment_image_tag=v1.5.2" \
+  -var="movie_image_tag=v1.3.1"
 
-# Mixed development deployment
+# Force service restart
 terraform apply \
   -var="deploy_services=true" \
-  -var="enable_auto_scaling=true" \
-  -var="backend_image_tag=dev-build-123" \
-  -var="payment_image_tag=v1.0.0" \
-  -var="movie_image_tag=v1.0.0"
-```
-
-**Per-Service Force Deployment:**
-```bash
-# Force restart only backend service
-terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="force_backend_deployment=true"
-
-# Force restart specific service with new image
-terraform apply \
-  -var="deploy_services=true" \
-  -var="enable_auto_scaling=true" \
-  -var="backend_image_tag=prometheus-v1" \
   -var="force_backend_deployment=true"
-
-# Emergency restart of all services
-terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true" -var="force_deployment=true"
 ```
 
-**Available deployment variables:**
-```bash
-# Infrastructure only
-terraform apply
+### Available Deployment Variables
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `deploy_services` | Enable ECS service deployment | `true/false` |
+| `enable_auto_scaling` | Enable auto-scaling policies | `true/false` |
+| `backend_image_tag` | Backend service image version | `v2.1.0` |
+| `payment_image_tag` | Payment service image version | `v1.5.2` |
+| `movie_image_tag` | Movie service image version | `v1.3.1` |
+| `force_*_deployment` | Force service restart | `true/false` |
 
-# Services without auto scaling
-terraform apply -var="deploy_services=true"
+## Monitoring Architecture
 
-# Services with auto scaling
-terraform apply -var="deploy_services=true" -var="enable_auto_scaling=true"
+### ADOT Sidecar Implementation
 
-# Per-service image control
--var="backend_image_tag=prometheus-v1"
--var="payment_image_tag=v1.2"
--var="movie_image_tag=v1.3"
-
-# Per-service force deployment
--var="force_backend_deployment=true"
--var="force_payment_deployment=true"
--var="force_movie_deployment=true"
-```
-
-**Important**: Services require the `deploy_services=true` variable to ensure ECS services are only created after container images are pushed to ECR. This prevents service deployment failures due to missing images.
-
-## Auto Scaling Configuration
-
-### Service-Level Scaling
-**CPU and Memory Based:**
-- **Scale Out**: When CPU > 70% OR Memory > 80%
-- **Scale In**: When CPU < 70% AND Memory < 80%
-- **Range**: 2-3-4 tasks per service
-
-### Instance-Level Scaling
-- **Scale Out**: When cluster memory reservation > 80%
-- **Scale In**: When cluster memory reservation < 30%
-- **Range**: 2-4 EC2 instances (t4g.small ARM64)
-
-### Complete Auto Scaling Flow
-**The infrastructure handles these scenarios:**
-1. **Container resource pressure** → Service scaling creates new containers
-2. **Instance capacity constraints** → Cluster scaling adds new EC2 instances
-3. **Low utilization periods** → Automatic scale-down for cost optimization
-4. **Protection mechanisms** → Min/max limits and cooldown periods prevent instability
-
-### Deployment Strategy
-**Resource-Aware Rolling Updates:**
-```bash
-deployment_maximum_percent         = 100  # Never exceed desired count
-deployment_minimum_healthy_percent = 50   # Allow 50% capacity during updates
-```
-
-**Why 100/50 Strategy:**
-- **Resource Constrained**: 2 t4g.small instances with limited capacity
-- **Cost Efficient**: No temporary over-provisioning during updates
-- **Acceptable Trade-off**: Brief 50% capacity reduction vs infrastructure costs
-- **Rollback Protection**: Automatic rollback if deployment fails
-
-## Monitoring & Observability Architecture
-
-### AWS Managed Prometheus Integration
-**Managed metrics collection and storage:**
-- **AMP Workspace**: Scalable, managed Prometheus storage
-- **ADOT Sidecar Pattern**: Distributed collection with auto-scaling
-- **IAM Authentication**: Secure metrics ingestion with AWS SigV4
-- **Cost Optimization**: Pay-per-metric ingestion model
-
-### ADOT (AWS Distro for OpenTelemetry) Configuration
-**Sidecar collector deployment:**
+**Container Task Structure:**
 ```yaml
-# Each backend task contains:
-- Backend Container (port 8080)
-- ADOT Collector Sidecar (scrapes backend:8080/metrics)
+ECS Task:
+  - Backend Container (port 8080)
+    ├── Exposes /metrics endpoint
+    └── Handles business logic
+  - ADOT Collector Sidecar
+    ├── Scrapes backend:8080/metrics
+    ├── Forwards to AWS Managed Prometheus
+    └── Uses container links for hostname resolution
 ```
 
-**Monitoring capabilities:**
-- **API Performance**: Request rates, response times, error tracking
-- **Endpoint Grouping**: Logical categorization (auth, booking, wallet, shows)
-- **Instance Tracking**: Unique deployment identification
-- **Automatic Scaling**: Collectors scale with backend tasks
+**Key Breakthrough: Bridge Networking Solution**
+
+**Problem:** Dynamic port mapping (host ports 32768+) made sidecar communication complex.
+
+**Solution:** Containers in the same ECS task share network namespace, enabling direct communication via container names.
+
+```yaml
+# ADOT Configuration
+receivers:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'skyfox-backend'
+          static_configs:
+            - targets: ["backend:8080"]  # Container name + internal port
+```
+
+**Implementation Details:**
+```bash
+# Task definition with container links
+container_definitions = jsonencode([
+  {
+    name = "backend"
+    # ... backend configuration
+  },
+  {
+    name = "adot-collector"
+    links = ["backend"]  # Enables hostname resolution
+    # ... ADOT configuration
+  }
+])
+```
+
+### ADOT Sidecar Custom Health Check
+If you encounter persistent issues with the standard AWS/ADOT container health checks on ECS, see the [./adot](./adot) directory.
+
+It contains a custom Go-based health checker and Dockerfile that ensure reliable health checks for the ADOT sidecar, especially in cases where conventional methods (like `wget` or `curl` in the container health check command) do not work as expected.
+
+For details and implementation guidance, refer to the **README** inside the `./adot` folder.
 
 ### Metrics Collection Strategy
-**Backend API metrics grouped by business function:**
-- **auth**: Login, security questions, password management
-- **customer_mgmt**: Profile management and signup
-- **wallet**: Payment and transaction operations  
-- **booking**: Reservation and ticket management
+
+**Business Function Grouping:**
+- **auth**: Authentication and security operations
+- **customer_mgmt**: User profile and account management
+- **wallet**: Payment and transaction processing
+- **booking**: Reservation and ticketing
 - **shows**: Movie catalog and scheduling
-- **admin**: Administrative operations
-- **checkin**: Staff check-in operations
+- **admin**: Administrative functions
 
-**Key metrics collected:**
-```
+**Key Metrics:**
+```bash
+# Request volume by endpoint group
 skyfox_http_requests_total{method, endpoint_group, status_code}
+
+# Response time distribution
 skyfox_http_request_duration_seconds{method, endpoint_group}
-skyfox_http_requests_in_flight
+
+# Active request monitoring
+skyfox_http_requests_in_flight{endpoint_group}
 ```
 
-### ADOT Sidecar Networking Solution
-**ECS Bridge Networking:**
-- **Problem**: Container dynamic ports (32768, 32769) not accessible via localhost:8080
-- **Solution**: Containers in same ECS task share network namespace
-- **Implementation**: ADOT scrapes `backend:8080` (container name + internal port)
-- **Scaling**: Each backend task gets its own ADOT collector (perfect isolation)
+## Auto-Scaling Configuration
+
+### Service-Level Scaling
+- **Trigger Conditions**: CPU > 70% OR Memory > 80%
+- **Scale Range**: 2-4 tasks per service
+- **Cooldown**: 300s scale-out, 300s scale-in
+
+### Cluster-Level Scaling
+- **Trigger Conditions**: Memory reservation > 80%
+- **Instance Range**: 2-4 t4g.small ARM64 instances
+- **Capacity Protection**: Prevents resource exhaustion
+
+### Rolling Update Strategy
+```bash
+deployment_configuration {
+  maximum_percent         = 100  # No over-provisioning
+  minimum_healthy_percent = 50   # 50% capacity during updates
+}
+```
+
+**Rationale:** Resource-constrained environment prioritizes cost efficiency over zero-downtime deployments.
 
 ## Technical Learnings & Solutions
 
@@ -296,74 +276,109 @@ skyfox_http_requests_in_flight
 - **Resource dependencies**: Proper ordering to avoid circular dependencies
 - **ARM64 optimization**: Cost-effective compute with ECS-optimized AMI
 
-### AWS Container Architecture
-- **ECS cluster design**: Single Auto Scaling Group serving all services
-- **ALB path-based routing**: Service discovery without service mesh complexity
-- **Multi-AZ deployment**: High availability across availability zones
-- **IAM role separation**: Instance vs task vs execution roles
+### Critical Architecture Decisions
 
-### Security Group Architecture
-- **Initial complexity**: Service-specific security groups created circular dependencies
-- **Solution**: Use `aws_security_group_rule` resources instead of inline rules
-- **Final architecture**: 3 security groups (External ALB, Internal ALB, ECS Instances) with proper isolation
-- **Dynamic port ranges**: Required for ALB communication with ECS containers (32768-65535)
+#### 1. Network Simplification
+**Initial Approach:** Private subnets with NAT Gateway and placement constraints<br>
+**Problem:** Placement constraint deadlock prevented service deployment<br>
+**Solution:** Public subnets with security group isolation<br>
+**Result:** Maintained security, eliminated complexity, reduced costs
+
+#### 2. ECS Bridge Networking Breakthrough
+**Challenge:** Sidecar monitoring with dynamic port mapping<br>
+**Discovery:** Same-task containers share network namespace<br>
+**Implementation:** Container links enable hostname resolution (`backend:8080`)<br>
+**Impact:** Scalable monitoring without service discovery complexity
+
+#### 3. Security Group Architecture
+**Initial Problem:** Circular dependencies with inline rules<br>
+**Solution:** Separate `aws_security_group_rule` resources<br>
+**Final Design:** Three-layer security (External ALB, Internal ALB, ECS)
 
 ### Container Health Monitoring
-- **Health check standardization**: All services use `wget` commands for container health checks
-- **Tool availability**: Health check commands must match tools available inside container images
-- **ECS vs ALB health checks**: Different health check mechanisms serve different purposes
+- **Standardized approach**: `wget` commands for container health checks<br>
+- **Tool compatibility**: Health check commands match container image tools<br>
+- **Dual purpose**: ECS health checks vs ALB target health
 
-### Network Security & Access
-- **ECS internet access**: Required for AWS services (ECR, Parameter Store, CloudWatch)
-- **Security group isolation**: Network boundaries maintained through security groups, not subnet complexity
-- **ALB communication**: Internal ALB restricted to ECS instances while maintaining service isolation
+### Deployment Management Patterns
+- **Independent versioning**: Per-service image tag control<br>
+- **Force restart capability**: Individual service deployment triggers<br>
+- **SHA-based updates**: Automatic deployment on task definition changes<br>
+- **Rollback protection**: Built-in failure recovery mechanisms
 
-### Service Update & Deployment Management
-- **Per-service image tags**: Independent versioning for each service (backend, payment, movie)
-- **Per-service force deployment**: Individual service restart capability  
-- **SHA-based auto-deployment**: Automatic updates when task definitions change
-- **Rollback protection**: Automatic rollback protection for failed deployments
-- **Fine-grained control**: Deploy services independently with different versions
+## Cost Optimization Strategies
 
-### Frontend URL Management
-- **Challenge**: ALB DNS names contain random identifiers that change on infrastructure recreation
-- **Solution**: Environment variable injection to configure frontend's backend configuration
-- **Options**: Vercel environment variables, Parameter Store, or custom domain with Route 53
-- **Learning**: Infrastructure URLs should be dynamic, not hardcoded in frontend applications
+### Infrastructure Efficiency
+- **ARM64 instances**: t4g.small for cost-effective compute
+- **No NAT Gateway**: Direct internet access eliminates unnecessary costs
+- **Shared infrastructure**: Single cluster serving multiple services
+- **Auto-scaling boundaries**: Prevent resource over-provisioning
 
-### Architecture Evolution
-- **Started with**: Complex design using private subnets with placement constraints
-- **Hit roadblock**: Placement constraint deadlock prevented services from finding appropriate instances
-- **Final solution**: All services in public subnets with security group isolation
-- **Result**: Maintained security while eliminating deployment complexity and improving resource efficiency
-
-### Critical ECS Networking Discoveries
-**Task-Level Network Isolation:**
-- **Key insight**: Containers within same ECS task share Docker bridge network
-- **Communication method**: Use container names + internal ports (`backend:8080`)
-- **Scaling behavior**: Multiple backend tasks on same instance = isolated networks per task
-- **ADOT implementation**: Each sidecar only sees its task's containers
-- **Industry standard**: Approach used by Netflix, Uber, AWS internal services
-
-**Bridge Networking Details:**
-- **Container ports vs host ports**: Internal (8080) vs dynamic external (32768+)
-- **Localhost limitation**: `localhost:8080` not accessible from host or other containers
-- **Sidecar advantage**: Perfect for intra-task communication without service discovery
-- **Multiple instance handling**: Task network isolation prevents cross-task interference
-
-### ADOT Configuration Management
-- **Template variables**: Resolved by Terraform at deployment time (`${ecs_cluster_name}`)
-- **Configuration storage**: EFS for shared access, Parameter Store for sensitive data
-- **Unique instance labeling**: Random deployment IDs for tracking and debugging
-
-### Key Problems Solved
-- **Placement Constraint Deadlock**: Simplified from private subnets with complex constraints to public subnets with security group isolation, maintaining security while eliminating deployment complexity
-- **ADOT Sidecar Networking**: Solved container-to-container communication within ECS tasks using bridge networking and container name resolution, enabling scalable monitoring without service discovery
-
-### Cost Optimization
-- **AWS Free Tier**: t4g.small instances and resource right-sizing
-- **No NAT Gateway**: Eliminated unnecessary networking costs
+### Operational Efficiency
 - **ECR lifecycle policies**: Automatic image cleanup
-- **Resource sharing**: Single infrastructure serving multiple services
-- **Efficient monitoring**: Sidecar pattern vs central Prometheus server
+- **Sidecar monitoring**: Eliminates dedicated Prometheus servers
+- **Parameter Store**: Centralized secret management
+- **Resource right-sizing**: Optimized for AWS Free Tier usage
 
+## Customization Guide
+
+### Environment-Specific Configuration
+1. **Update variables.tf**: Modify default values for your environment
+2. **Customize networking**: Adjust CIDR blocks and subnet configuration
+3. **Service scaling**: Configure auto-scaling thresholds
+4. **Monitoring setup**: Customize ADOT configuration for specific metrics
+
+### Adding New Services
+1. **Create service module**: Follow existing service patterns in `ecs/services.tf`
+2. **Update ALB**: Add path-based routing rules
+3. **Configure monitoring**: Add ADOT sidecar for new service
+4. **Update variables**: Add service-specific configuration options
+
+### Security Considerations
+- **IAM roles**: Follow principle of least privilege
+- **Security groups**: Maintain layered network security
+- **Parameter Store**: Use SecureString for sensitive data
+- **Container images**: Regular security updates and vulnerability scanning
+
+## Troubleshooting
+
+### Common Issues
+1. **Service deployment failures**: Check ECR image availability
+2. **Container startup issues**: Verify Parameter Store permissions
+3. **Monitoring gaps**: Validate ADOT container links configuration
+4. **Auto-scaling problems**: Review CloudWatch metrics and thresholds
+
+### Useful Commands
+```bash
+# Check service status
+aws ecs describe-services --cluster skyfox-devprod-cluster --services backend
+
+# View container logs
+aws logs filter-log-events --log-group-name /ecs/skyfox-devprod-backend
+
+# Test metrics endpoint
+curl http://backend:8080/metrics  # From ADOT container
+
+# Verify Prometheus data
+# Use provided PromQL queries in Grafana
+```
+
+### Best Practices
+- **Version control**: Tag infrastructure releases
+- **Change management**: Use Terraform plan before apply
+- **Monitoring**: Validate metrics after deployment
+- **Rollback planning**: Maintain previous working configurations
+
+---
+
+**Infrastructure Status:** Production-ready with enterprise monitoring and auto-scaling capabilities.
+
+**Maintenance:** Regular updates for security patches and AWS service improvements.
+
+**Support:** Architecture designed for operational simplicity and troubleshooting efficiency.
+
+---
+
+## License
+
+See the [LICENSE](LICENSE) file for details.

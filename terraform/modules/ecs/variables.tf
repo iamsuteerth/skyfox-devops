@@ -286,3 +286,33 @@ variable "movie_image_tag" {
   type        = string
   default     = "latest"
 }
+
+variable "adot_image_tag" {
+  description = "Container image tag for backend service adot collector"
+  type        = string
+  default     = "latest"
+}
+
+variable "backend_container_name" {
+  description = "Container name for backend tasks"
+  type = string
+  default = "backend"
+}
+
+variable "movie_container_name" {
+  description = "Container name for movie tasks"
+  type = string
+  default = "movie"
+}
+
+variable "payment_container_name" {
+  description = "Container name for payment tasks"
+  type = string
+  default = "payment"
+}
+
+variable "adot_container_name" {
+  description = "Container name for adot tasks"
+  type = string
+  default = "adot-collector"
+}

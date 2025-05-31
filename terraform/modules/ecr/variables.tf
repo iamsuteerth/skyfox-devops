@@ -11,7 +11,7 @@ variable "environment" {
 variable "repository_names" {
   description = "List of ECR Repository Names"
   type = list(string)
-  default = [ "backend", "payment-service", "movie-service" ]
+  default = [ "backend", "payment-service", "movie-service", "adot" ]
 }
 
 variable "image_tag_mutability" {

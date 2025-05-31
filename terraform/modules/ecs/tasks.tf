@@ -9,7 +9,7 @@ resource "aws_ecs_task_definition" "payment" {
 
   container_definitions = jsonencode([
     {
-      name      = "payment"
+      name      = var.payment_container_name
       image = "${var.repository_urls["payment-service"]}:${var.payment_image_tag}"
       cpu       = var.payment_cpu
       memory    = var.payment_memory
@@ -92,7 +92,7 @@ resource "aws_ecs_task_definition" "movie" {
 
   container_definitions = jsonencode([
     {
-      name      = "movie"
+      name      = var.movie_container_name
       image = "${var.repository_urls["movie-service"]}:${var.movie_image_tag}"
       cpu       = var.movie_cpu
       memory    = var.movie_memory
@@ -173,26 +173,14 @@ resource "aws_ecs_task_definition" "backend" {
   network_mode             = "bridge"
   requires_compatibilities = ["EC2"]
   execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
-  task_role_arn           = aws_iam_role.ecs_task_role.arn
+  task_role_arn            = aws_iam_role.ecs_task_role.arn
 
   cpu    = var.backend_cpu + var.adot_cpu     
   memory = var.backend_memory + var.adot_memory
 
-  volume {
-    name = "adot-config"
-    efs_volume_configuration {
-      file_system_id     = aws_efs_file_system.adot_config.id
-      transit_encryption = "ENABLED"
-      authorization_config {
-        access_point_id = aws_efs_access_point.adot_config.id
-        iam             = "ENABLED"
-      }
-    }
-  }
-
   container_definitions = jsonencode([
     {
-      name      = "backend"
+      name      = var.backend_container_name
       image = "${var.repository_urls["backend"]}:${var.backend_image_tag}"
       cpu       = var.backend_cpu
       memory    = var.backend_memory
@@ -279,12 +267,21 @@ resource "aws_ecs_task_definition" "backend" {
       }
     },
     {
-      name  = "adot-collector"
-      image = "public.ecr.aws/aws-observability/aws-otel-collector:latest"
+      name  = var.adot_container_name
+      image = "${var.repository_urls["adot"]}:${var.adot_image_tag}"
       
       essential = false
       cpu       = var.adot_cpu
       memory    = var.adot_memory
+
+      dependsOn = [
+        {
+          containerName = var.backend_container_name
+          condition     = "HEALTHY"  
+        }
+      ]
+
+      links = [var.backend_container_name]
 
       environment = [
         {
@@ -313,6 +310,17 @@ resource "aws_ecs_task_definition" "backend" {
       ]
 
       command = ["--config=env:ADOT_CONFIG_CONTENT"]
+
+      healthCheck = {
+        command = [
+          "CMD",
+          "/bin/healthchecker"
+        ]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 60
+      }
 
       logConfiguration = {
         logDriver = "awslogs"
