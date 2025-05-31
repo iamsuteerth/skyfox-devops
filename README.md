@@ -54,6 +54,17 @@ SkyFox is a movie platform backend with three core services deployed on AWS ECS:
 - **Container links resolution**: Enables `backend:8080` hostname resolution in bridge mode
 - **Unique deployment tracking**: Instance labeling with deployment IDs
 
+## Grafana Dashboard
+![Grafana Dashboard](./Grafana_Dashboard.png)
+
+**Created by setting using AWS Managed Prometheus as data source and the configuration + PromQL Queries present in [config json.](./grafana_config.json)**
+### Stats Covered
+- **Business API Traffic**
+- **API Latency**
+- **API Noise**
+- **Status Code Distribution**
+- **Malicious Requests Blocked**
+- **Malicious Requests Not Blocked**
 ## Repository Structure
 
 ```
@@ -379,6 +390,17 @@ curl http://backend:8080/metrics  # From ADOT container
 **Support:** Architecture designed for operational simplicity and troubleshooting efficiency.
 
 ---
+
+## CI/CD Readiness
+
+This project is designed to integrate seamlessly with automated CI/CD pipelines (GoCD, GitHub Actions, etc.).  
+For a production deployment, it’s trivial to add an automated system that:
+- Watches for commits on the main branch,
+- Builds and pushes Docker images,
+- Updates the relevant Terraform image tag variable,
+- And triggers a targeted `terraform apply` for zero-touch delivery.
+
+It's more of a matter of, `I didn't feel like it` that you're not seeing it implemented in this project because configuring a CI/CD pipeline is just all about getting the right configuration values and triggered actions.
 
 ## License
 
